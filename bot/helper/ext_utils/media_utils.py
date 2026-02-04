@@ -543,6 +543,9 @@ class FFMpeg:
         output = f"{base_name}.{ext}"
         if retry:
             cmd = [
+                "taskset",
+                "-c",
+                f"{cores}",
                 BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
@@ -562,13 +565,16 @@ class FFMpeg:
                 output,
             ]
             if ext == "mp4":
-                cmd[14:14] = ["-c:s", "mov_text"]
+                cmd[17:17] = ["-c:s", "mov_text"]
             elif ext == "mkv":
-                cmd[14:14] = ["-c:s", "ass"]
+                cmd[17:17] = ["-c:s", "ass"]
             else:
-                cmd[14:14] = ["-c:s", "copy"]
+                cmd[17:17] = ["-c:s", "copy"]
         else:
             cmd = [
+                "taskset",
+                "-c",
+                f"{cores}",
                 BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
@@ -620,6 +626,9 @@ class FFMpeg:
         base_name = ospath.splitext(audio_file)[0]
         output = f"{base_name}.{ext}"
         cmd = [
+            "taskset",
+            "-c",
+            f"{cores}",
             BinConfig.FFMPEG_NAME,
             "-hide_banner",
             "-loglevel",
@@ -690,6 +699,9 @@ class FFMpeg:
         filter_complex += f"concat=n={len(segments)}:v=1:a=1[vout][aout]"
 
         cmd = [
+            "taskset",
+            "-c",
+            f"{cores}",
             BinConfig.FFMPEG_NAME,
             "-hide_banner",
             "-loglevel",
@@ -751,6 +763,9 @@ class FFMpeg:
         while i <= parts or start_time < duration - 4:
             out_path = f_path.replace(file_, f"{base_name}.part{i:03}{extension}")
             cmd = [
+                "taskset",
+                "-c",
+                f"{cores}",
                 BinConfig.FFMPEG_NAME,
                 "-hide_banner",
                 "-loglevel",
@@ -778,8 +793,8 @@ class FFMpeg:
                 out_path,
             ]
             if not multi_streams:
-                del cmd[12]
-                del cmd[12]
+                del cmd[15]
+                del cmd[15]
             if self._listener.is_cancelled:
                 return False
             self._listener.subproc = await create_subprocess_exec(
