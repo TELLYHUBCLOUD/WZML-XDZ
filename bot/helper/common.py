@@ -21,6 +21,9 @@ from .. import (
     task_dict_lock,
     user_data,
 )
+threads = max(1, cpu_no // 2)
+cores = ",".join(str(i) for i in range(threads))
+
 from ..core.config_manager import Config, BinConfig
 from ..core.tg_client import TgClient
 from .ext_utils.bot_utils import get_size_bytes, new_task, sync_to_async
@@ -666,6 +669,9 @@ class TaskConfig:
             for ffmpeg_cmd in cmds:
                 self.proceed_count = 0
                 cmd = [
+                    "taskset",
+                    "-c",
+                    f"{cores}",
                     BinConfig.FFMPEG_NAME,
                     "-hide_banner",
                     "-loglevel",
@@ -703,6 +709,8 @@ class TaskConfig:
                     ] and not dl_path.strip().lower().endswith(ext):
                         break
                     new_folder = ospath.splitext(dl_path)[0]
+                    if await aiopath.isfile(new_folder):
+                        new_folder = f"{new_folder}_temp"
                     name = ospath.basename(dl_path)
                     await makedirs(new_folder, exist_ok=True)
                     file_path = f"{new_folder}/{name}"
@@ -717,9 +725,10 @@ class TaskConfig:
                         await cpu_eater_lock.acquire()
                         self.progress = True
                     LOGGER.info(f"Running ffmpeg cmd for: {file_path}")
-                    cmd[index + 1] = file_path
+                    var_cmd = cmd.copy()
+                    var_cmd[index + 1] = file_path
                     self.subsize = self.size
-                    res = await ffmpeg.ffmpeg_cmds(cmd, file_path)
+                    res = await ffmpeg.ffmpeg_cmds(var_cmd, file_path)
                     if res:
                         if delete_files:
                             await remove(file_path)
