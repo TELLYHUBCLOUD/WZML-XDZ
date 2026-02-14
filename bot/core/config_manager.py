@@ -97,6 +97,8 @@ class Config:
     TELEGRAM_HASH = ""
     TG_PROXY = None
     THUMBNAIL_LAYOUT = ""
+    USE_GRID_THUMBNAIL = False  
+    GRID_THUMBNAIL_LAYOUT = "2x3"   
     VERIFY_TIMEOUT = 0
     LOGIN_PASS = ""
     TORRENT_TIMEOUT = 0
