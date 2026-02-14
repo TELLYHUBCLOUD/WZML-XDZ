@@ -398,7 +398,7 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots, co
             "-i",
             f"{escape(dirpath)}/*.png",  # FFmpeg handles glob internally (safer than Python glob)
             "-vf",
-            f"tile={layout}",
+            f"tile={layout},format=yuv420p", 
             "-q:v",
             "1",
             "-frames:v",
@@ -434,40 +434,50 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots, co
 
 
 async def _add_rounded_corners_to_images(image_paths, radius):
-    """Process multiple images with rounded corners using thread pool for CPU-bound PIL ops."""
-    loop = asyncio.get_running_loop()  # NOW WORKS: asyncio module is imported
+    """Process multiple images with white background + rounded corners."""
+    loop = asyncio.get_running_loop()
     with ThreadPoolExecutor(max_workers=threads) as executor:
         await asyncio.gather(*[
-            loop.run_in_executor(None, _process_single_image, path, radius)
+            loop.run_in_executor(None, _process_single_image_with_white_bg, path, radius)
             for path in image_paths
         ])
 
 
-def _process_single_image(image_path, radius):
-    """Synchronous helper to add rounded corners to a single image."""
+def _process_single_image_with_white_bg(image_path, radius):
+    """Add white background + rounded corners (output RGB, no alpha)."""
     try:
         with Image.open(image_path) as img:
-            # Convert to RGBA for proper alpha channel support
-            if img.mode != 'RGBA':
-                img = img.convert("RGBA")
-            
-            # Adjust radius to prevent artifacts on small images
+            # Ensure RGB (remove alpha if present)
+            if img.mode in ("RGBA", "LA"):
+                # Create white background and paste image on it
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                if img.mode == "RGBA":
+                    bg.paste(img, mask=img.split()[-1])  # Use alpha as mask
+                else:  # "LA"
+                    bg.paste(img, mask=img.split()[-1])
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            # Adjust radius for small images
             safe_radius = min(radius, img.width // 4, img.height // 4)
-            if safe_radius < 2:  # Minimum radius for visible effect
+            if safe_radius < 2:
                 safe_radius = 2
-            
+
             # Create rounded mask
             mask = Image.new("L", img.size, 0)
             draw = ImageDraw.Draw(mask)
             draw.rounded_rectangle([(0, 0), img.size], radius=safe_radius, fill=255)
-            
-            # Apply mask to image
-            img.putalpha(mask)
-            
-            # Save as PNG to preserve transparency
-            img.save(image_path, "PNG", optimize=True)
+
+            # Apply mask → creates soft edge (but we keep RGB only)
+            # To avoid transparency, we composite onto white again
+            output = Image.new("RGB", img.size, (255, 255, 255))
+            output.paste(img, mask=mask)
+
+            # Save as PNG (lossless) — FFmpeg will convert to JPEG later
+            output.save(image_path, "PNG", optimize=True)
     except Exception as e:
-        LOGGER.warning(f"Failed to add rounded corners to {image_path}: {e}")
+        LOGGER.warning(f"Failed to process {image_path} for white-bg rounded corners: {e}")
 
 
 class FFMpeg:
