@@ -2,7 +2,7 @@ import re
 from contextlib import suppress
 from PIL import Image, ImageDraw
 from hashlib import md5
-from aiofiles.os import remove, path as aiopath, makedirs
+from aiofiles.os import remove, path as aiopath, makedirs, listdir
 import json
 from asyncio import (
     create_subprocess_exec,
@@ -11,12 +11,11 @@ from asyncio import (
     sleep,
 )
 from asyncio.subprocess import PIPE
-from os import path as ospath
+from os import path as ospath, listdir as os_listdir
 from re import search as re_search, escape
 from time import time
 from aioshutil import rmtree
 from langcodes import Language
-import glob
 from concurrent.futures import ThreadPoolExecutor
 
 from ... import LOGGER, cpu_no, DOWNLOAD_DIR
@@ -158,6 +157,16 @@ async def get_document_type(path):
 
 
 async def get_streams(file):
+    """
+    Gets media stream information using ffprobe.
+
+    Args:
+        file: Path to the media file.
+
+    Returns:
+        A list of stream objects (dictionaries) or None if an error occurs
+        or no streams are found.
+    """
     cmd = [
         "ffprobe",
         "-hide_banner",
@@ -330,15 +339,49 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots, co
     ss_nb = int(ss_dims[0]) * int(ss_dims[1])
     if ss_nb == 0:
         LOGGER.error(f"Invalid layout value: {layout}")
+        return None
+    
     dirpath = await take_ss(video_file, ss_nb)
     if not dirpath:
         return None
+    
     try:
-        screenshot_files = sorted(glob.glob(ospath.join(dirpath, "*.png")))
+        # SAFELY list PNG files WITHOUT glob (avoids issues with [ ] in paths)
+        try:
+            all_files = await listdir(dirpath)
+            screenshot_files = [
+                ospath.join(dirpath, f) for f in all_files 
+                if f.lower().endswith('.png') and f.startswith('SS.')
+            ]
+            screenshot_files.sort()  # Ensure consistent ordering
+            
+            if not screenshot_files:
+                # Fallback to os-level listing if aiofiles.listdir fails
+                all_files = os_listdir(dirpath)
+                screenshot_files = [
+                    ospath.join(dirpath, f) for f in all_files 
+                    if f.lower().endswith('.png') and f.startswith('SS.')
+                ]
+                screenshot_files.sort()
+        except Exception as e:
+            LOGGER.warning(f"Error listing directory {dirpath}: {e}")
+            all_files = os_listdir(dirpath)
+            screenshot_files = [
+                ospath.join(dirpath, f) for f in all_files 
+                if f.lower().endswith('.png') and f.startswith('SS.')
+            ]
+            screenshot_files.sort()
+        
         if not screenshot_files:
-            LOGGER.error(f"No screenshots found in {dirpath}")
+            LOGGER.error(f"No screenshots found in {dirpath}. Files present: {os_listdir(dirpath)}")
             return None
+        
+        LOGGER.debug(f"Found {len(screenshot_files)} screenshots in {dirpath}")
+        
+        # Add rounded corners to all screenshots
         await _add_rounded_corners_to_images(screenshot_files, corner_radius)
+        
+        # Create tiled thumbnail with FFmpeg
         output_dir = f"{DOWNLOAD_DIR}thumbnails"
         await makedirs(output_dir, exist_ok=True)
         output = ospath.join(output_dir, f"{time()}.jpg")
@@ -354,7 +397,7 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots, co
             "-pattern_type",
             "glob",
             "-i",
-            f"{escape(dirpath)}/*.png",
+            f"{escape(dirpath)}/*.png",  # FFmpeg's glob handles special chars better
             "-vf",
             f"tile={layout}",
             "-q:v",
@@ -375,9 +418,9 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots, co
                     f"Error while combining thumbnails for video. Name: {video_file} stderr: {err}"
                 )
                 return None
-        except Exception:
+        except Exception as e:
             LOGGER.error(
-                f"Error while combining thumbnails from video. Name: {video_file}. Error: Timeout some issues with ffmpeg with specific arch!"
+                f"Error while combining thumbnails from video. Name: {video_file}. Error: {e}"
             )
             return None
         
@@ -391,7 +434,7 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots, co
 async def _add_rounded_corners_to_images(image_paths, radius):
     """Process multiple images with rounded corners using thread pool for CPU-bound PIL ops."""
     loop = asyncio.get_running_loop()
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=threads) as executor:
         await asyncio.gather(*[
             loop.run_in_executor(None, _process_single_image, path, radius)
             for path in image_paths
@@ -402,12 +445,24 @@ def _process_single_image(image_path, radius):
     """Synchronous helper to add rounded corners to a single image."""
     try:
         with Image.open(image_path) as img:
-            img = img.convert("RGBA")
+            # Convert to RGBA for proper alpha channel support
+            if img.mode != 'RGBA':
+                img = img.convert("RGBA")
+            
+            # Adjust radius to prevent artifacts on small images
             safe_radius = min(radius, img.width // 4, img.height // 4)
+            if safe_radius < 2:  # Minimum radius for visible effect
+                safe_radius = 2
+            
+            # Create rounded mask
             mask = Image.new("L", img.size, 0)
             draw = ImageDraw.Draw(mask)
             draw.rounded_rectangle([(0, 0), img.size], radius=safe_radius, fill=255)
+            
+            # Apply mask to image
             img.putalpha(mask)
+            
+            # Save as PNG to preserve transparency
             img.save(image_path, "PNG", optimize=True)
     except Exception as e:
         LOGGER.warning(f"Failed to add rounded corners to {image_path}: {e}")
