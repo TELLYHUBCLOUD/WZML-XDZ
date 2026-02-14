@@ -320,9 +320,9 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
     buttons.data_button("♻", f"status {sid} ref", position="header")
     button = buttons.build_menu(8)
 
-    # System stats footer
-         msg += "\n"
-         msg += "⌬ <b><i>𝗕𝗢𝗧 𝗦𝗧𝗔𝗧𝗦</i></b>"
+# System stats footer
+    msg += "\n"
+    msg += "⌬ <b><i>𝗕𝗢𝗧 𝗦𝗧𝗔𝗧𝗦</i></b>"
     msg += "\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬✘▬\n"
     msg += f"╭<b>CPU »</b> {cpu_percent()}% | <b>FREE »</b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}\n"
     msg += f"╰<b>RAM »</b> {virtual_memory().percent}% | <b>UP »</b> {get_readable_time(time() - bot_start_time)}\n"
