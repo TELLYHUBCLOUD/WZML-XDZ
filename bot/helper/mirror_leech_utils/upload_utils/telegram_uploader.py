@@ -76,6 +76,8 @@ class TelegramUploader:
         self._log_msg = None
         self._user_session = self._listener.user_transmission
         self._error = ""
+        self._use_grid_thumb = False  # NEW
+        self._grid_layout = "2x3"  # NEW
 
     async def _upload_progress(self, current, _):
         if self._listener.is_cancelled:
@@ -95,6 +97,8 @@ class TelegramUploader:
             "LEECH_SUFFIX": ("_lsuffix", ""),
             "LEECH_CAPTION": ("_lcaption", ""),
             "LEECH_FONT": ("_lfont", ""),
+            "USE_GRID_THUMBNAIL": ("_use_grid_thumb", False),  # NEW
+            "GRID_THUMBNAIL_LAYOUT": ("_grid_layout", "2x3"),  # NEW
         }
 
         for key, (attr, default) in settings_map.items():
@@ -456,7 +460,15 @@ class TelegramUploader:
             ):
                 key = "documents"
                 if is_video and thumb is None:
-                    thumb = await get_video_thumbnail(self._up_path, None)
+                    # MODIFIED: Grid thumbnail logic for documents
+                    if self._use_grid_thumb:
+                        thumb = await get_multiple_frames_thumbnail(
+                            self._up_path,
+                            self._grid_layout,
+                            False  # keep_screenshots
+                        )
+                    if thumb is None:  # Fallback to normal thumbnail
+                        thumb = await get_video_thumbnail(self._up_path, None)
 
                 if self._listener.is_cancelled:
                     return
@@ -474,14 +486,28 @@ class TelegramUploader:
             elif is_video:
                 key = "videos"
                 duration = (await get_media_info(self._up_path))[0]
-                if thumb is None and self._listener.thumbnail_layout:
-                    thumb = await get_multiple_frames_thumbnail(
-                        self._up_path,
-                        self._listener.thumbnail_layout,
-                        self._listener.screen_shots,
-                    )
+                
+                # MODIFIED: Grid thumbnail logic for videos
                 if thumb is None:
-                    thumb = await get_video_thumbnail(self._up_path, duration)
+                    if self._use_grid_thumb:
+                        # Use grid thumbnail (multiple frames)
+                        thumb = await get_multiple_frames_thumbnail(
+                            self._up_path,
+                            self._grid_layout,
+                            False  # keep_screenshots
+                        )
+                    elif self._listener.thumbnail_layout:
+                        # Use listener's layout if specified
+                        thumb = await get_multiple_frames_thumbnail(
+                            self._up_path,
+                            self._listener.thumbnail_layout,
+                            self._listener.screen_shots,
+                        )
+                    
+                    # Fallback to single frame thumbnail
+                    if thumb is None:
+                        thumb = await get_video_thumbnail(self._up_path, duration)
+                
                 if thumb is not None and thumb != "none":
                     with Image.open(thumb) as img:
                         width, height = img.size
