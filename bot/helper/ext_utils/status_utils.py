@@ -268,8 +268,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
                 msg += f"\n┊ <b>Status »</b> <b><a href='{task.listener.message.link}'>{tstatus}</a> » {task.speed()}</b>"
             else:
                 msg += f"\n┊ <b>Status »</b> <b>{tstatus} » {task.speed()}</b>"
-            msg += f"\n┊ <b>Done »</b> <i>{task.processed_bytes()}{subsize}</i>"
-            msg += f"\n┊ <b>Total »</b> <i>{task.size()}</i>"
+            msg += f"\n┊ <b>Done »</b> <i>{task.processed_bytes()}{subsize} / {task.size()}</i>"
             if count:
                 msg += f"\n┊ <b>Count »</b> <b>{count}</b>"
             msg += f"\n┊ <b>ETA »</b> <i>{task.eta()}</i>"
@@ -284,8 +283,7 @@ async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=
             # TODO: Add Connected Peers
         elif tstatus == MirrorStatus.STATUS_SEED:
             msg += f"\n┊ <b>Status »</b> <b>{tstatus} » {task.seed_speed()}</b>"
-            msg += f"\n┊ <b>Done »</b> <i>{task.uploaded_bytes()}</i>"
-            msg += f"\n┊ <b>Total »</b> <i>{task.size()}</i>"
+            msg += f"\n┊ <b>Done »</b> <i>{task.uploaded_bytes()} / {task.size()}</i>"
             msg += f"\n┊ <b>Ratio »</b> <i>{task.ratio()}</i>"
             msg += f"\n┊ <b>ETA »</b> <i>{task.seeding_time()}</i>"
             msg += f"\n┊ <b>Past »</b> <i>{get_readable_time(elapsed)}</i>"
