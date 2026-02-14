@@ -3,17 +3,14 @@ from functools import partial
 from html import escape
 from io import BytesIO
 from os import getcwd
-from re import sub
+from re import sub, match as re_match
 from time import time
-
 from aiofiles.os import makedirs, remove
 from aiofiles.os import path as aiopath
-from langcodes import Language
+from langcodes import Language # Ensure langcodes is installed: pip install langcodes
 from pyrogram.filters import create
 from pyrogram.handlers import MessageHandler
-
 from bot.helper.ext_utils.status_utils import get_readable_file_size
-
 from .. import auth_chats, excluded_extensions, sudo_users, user_data
 from ..core.config_manager import Config
 from ..core.tg_client import TgClient
@@ -42,10 +39,16 @@ leech_options = [
     "LEECH_SUFFIX",
     "LEECH_CAPTION",
     "THUMBNAIL_LAYOUT",
+    "USE_GRID_THUMBNAIL",
+    "GRID_THUMBNAIL_LAYOUT",
 ]
+
 rclone_options = ["RCLONE_CONFIG", "RCLONE_PATH", "RCLONE_FLAGS"]
+
 gdrive_options = ["TOKEN_PICKLE", "GDRIVE_ID", "INDEX_URL"]
-ffset_options = ["FFMPEG_CMDS"]
+
+ffset_options = ["FFMPEG_CMDS"] # Typo? Perhaps 'ff_options'
+
 advanced_options = [
     "EXCLUDED_EXTENSIONS",
     "NAME_SWAP",
@@ -54,31 +57,36 @@ advanced_options = [
     "USER_COOKIE_FILE",
 ]
 
+# Ensure all options used in menus/submenus are defined here for descriptions.
 user_settings_text = {
     "THUMBNAIL": (
         "Photo or Doc",
         "Custom Thumbnail is used as the thumbnail for the files you upload to telegram in media or document mode.",
-        "<i>Send a photo to save it as custom thumbnail.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "<i>Send a photo to save it as custom thumbnail.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "RCLONE_CONFIG": (
         "",
         "",
-        "<i>Send your <code>rclone.conf</code> file to use as your Upload Dest to RClone.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "<i>Send your <code>rclone.conf</code> file to use as your Upload Dest to RClone.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "TOKEN_PICKLE": (
         "",
         "",
-        "<i>Send your <code>token.pickle</code> to use as your Upload Dest to GDrive</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "<i>Send your <code>token.pickle</code> to use as your Upload Dest to GDrive</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "LEECH_SPLIT_SIZE": (
         "",
         "",
-        f"Send Leech split size in bytes or use gb or mb. Example: 40000000 or 2.5gb or 1000mb. PREMIUM_USER: {TgClient.IS_PREMIUM_USER}.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        f"Send Leech split size in bytes or use gb or mb. Example: 40000000 or 2.5gb or 1000mb. PREMIUM_USER: {TgClient.IS_PREMIUM_USER}.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "LEECH_DUMP_CHAT": (
         "",
         "",
-        """Send leech destination ID/USERNAME/PM. 
+        """Send leech destination ID/USERNAME/PM.
 * b:id/@username/pm (b: means leech by bot) (id or username of the chat or write pm means private message so bot will send the files in private to you) when you should use b:(leech by bot)? When your default settings is leech by user and you want to leech by bot for specific task.
 * u:id/@username(u: means leech by user) This incase OWNER added USER_STRING_SESSION.
 * h:id/@username(hybrid leech) h: to upload files by bot and user based on file size.
@@ -88,52 +96,68 @@ user_settings_text = {
     "LEECH_PREFIX": (
         "",
         "",
-        "Send Leech Filename Prefix. You can add HTML tags. Example: <code>@mychannel</code>.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Leech Filename Prefix. You can add HTML tags. Example: <code>@mychannel</code>.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "LEECH_SUFFIX": (
         "",
         "",
-        "Send Leech Filename Suffix. You can add HTML tags. Example: <code>@mychannel</code>.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Leech Filename Suffix. You can add HTML tags. Example: <code>@mychannel</code>.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "LEECH_CAPTION": (
         "",
         "",
-        "Send Leech Caption. You can add HTML tags. Example: <code>@mychannel</code>.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Leech Caption. You can add HTML tags. Example: <code>@mychannel</code>.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "THUMBNAIL_LAYOUT": (
         "",
         "",
-        "Send thumbnail layout (widthxheight, 2x2, 3x3, 2x4, 4x4, ...). Example: 3x3.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send thumbnail layout (widthxheight, 2x2, 3x3, 2x4, 4x4, ...). Example: 3x3.</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
+    ),
+    "GRID_THUMBNAIL_LAYOUT": (
+        "",
+        "",
+        "Send grid thumbnail layout (widthxheight, 2x3, 3x3, 3x2, ...). Example: 2x3 (2 columns, 3 rows = 6 frames).</i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "RCLONE_PATH": (
         "",
         "",
-        "Send Rclone Path. If you want to use your rclone config edit using owner/user config from usetting or add mrcc: before rclone path. Example mrcc:remote:folder. </i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Rclone Path. If you want to use your rclone config edit using owner/user config from usetting or add mrcc: before rclone path. Example mrcc:remote:folder. </i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "RCLONE_FLAGS": (
         "",
         "",
-        "key:value|key|key|key:value . Check here all <a href='https://rclone.org/flags/'>RcloneFlags</a>\nEx: --buffer-size:8M|--drive-starred-only",
+        "key:value|key|key|key:value . Check here all <a href='https://rclone.org/flags/'>RcloneFlags</a>\n"
+        "Ex: --buffer-size:8M|--drive-starred-only",
     ),
     "GDRIVE_ID": (
         "",
         "",
-        "Send Gdrive ID. If you want to use your token.pickle edit using owner/user token from usetting or add mtp: before the id. Example: mtp:F435RGGRDXXXXXX . </i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Gdrive ID. If you want to use your token.pickle edit using owner/user token from usetting or add mtp: before the id. Example: mtp:F435RGGRDXXXXXX . </i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "INDEX_URL": (
         "",
         "",
-        "Send Index URL for your gdrive option. </i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Index URL for your gdrive option. </i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "UPLOAD_PATHS": (
         "",
         "",
-        "Send Dict of keys that have path values. Example: {'path 1': 'remote:rclonefolder', 'path 2': 'gdrive1 id', 'path 3': 'tg chat id', 'path 4': 'mrcc:remote:', 'path 5': b:@username} . </i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send Dict of keys that have path values. Example: {'path 1': 'remote:rclonefolder', 'path 2': 'gdrive1 id', 'path 3': 'tg chat id', 'path 4': 'mrcc:remote:', 'path 5': b:@username} . </i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "EXCLUDED_EXTENSIONS": (
         "",
         "",
-        "Send exluded extenions seperated by space without dot at beginning. </i> \n╰ <b>Time Left :</b> <code>60 sec</code>",
+        "Send exluded extenions seperated by space without dot at beginning. </i>\n"
+        "╰ <b>Time Left :</b> <code>60 sec</code>",
     ),
     "NAME_SWAP": (
         "",
@@ -149,8 +173,8 @@ user_settings_text = {
         """Format: {key: value, key: value, key: value}.
 Example: {"format": "bv*+mergeall[vcodec=none]", "nocheckcertificate": True, "playliststart": 10, "fragment_retries": float("inf"), "matchtitle": "S13", "writesubtitles": True, "live_from_start": True, "postprocessor_args": {"ffmpeg": ["-threads", "4"]}, "wait_for_video": (5, 100), "download_ranges": [{"start_time": 0, "end_time": 10}]}
 Check all yt-dlp api options from this <a href='https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/YoutubeDL.py#L184'>FILE</a> or use this <a href='https://t.me/mltb_official_channel/177'>script</a> to convert cli arguments to api options.
-
-<i>Send dict of YT-DLP Options according to format.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>""",
+<i>Send dict of YT-DLP Options according to format.</i>
+╰ <b>Time Left :</b> <code>60 sec</code>""",
     ),
     "FFMPEG_CMDS": (
         "",
@@ -165,25 +189,25 @@ Here I will explain how to use mltb.* which is reference to files you want to wo
 2. Second cmd: the input is mltb.video so this cmd will work on all videos and the output is only mltb so the extenstion is same as input files.
 3. Third cmd: the input in mltb.m4a so this cmd will work only on m4a audios and the output is mltb.mp3 so the output extension is mp3.
 4. Fourth cmd: the input is mltb.audio so this cmd will work on all audios and the output is mltb.mp3 so the output extension is mp3.
-
-<i>Send dict of FFMPEG_CMDS Options according to format.</i> \n╰ <b>Time Left :</b> <code>60 sec</code>
-""",
-    ),
-    "METADATA_CMDS": (
-        "",
-        "",
-        """<i>Send your Meta data. You can according to the format title="Join @WZML_X".</i>
-<b>Full Documentation Guide</b> <a href="https://t.me/WZML_X/">Click Here</a>
+<i>Send dict of FFMPEG_CMDS Options according to format.</i>
 ╰ <b>Time Left :</b> <code>60 sec</code>
 """,
     ),
+    # "METADATA_CMDS": ( # Uncomment if METADATA_CMDS is used elsewhere
+    #     "",
+    #     "",
+    #     """<i>Send your Meta data. You can according to the format title="Join @WZML_X".</i>
+    # <b>Full Documentation Guide</b> <a href="https://t.me/WZML_X/">Click Here</a>
+    # ╰ <b>Time Left :</b> <code>60 sec</code>
+    # """,
+    # ),
     "USER_COOKIE_FILE": (
         "File",
         "User's YT-DLP Cookie File to authenticate access to websites and youtube.",
-        "<i>Send your cookie file (e.g., cookies.txt).</i> \n┖ <b>Time Left :</b> <code>60 sec</code>",
+        "<i>Send your cookie file (e.g., cookies.txt).</i>\n"
+        "┖ <b>Time Left :</b> <code>60 sec</code>",
     ),
 }
-
 
 async def get_user_settings(from_user, stype="main"):
     user_id = from_user.id
@@ -203,7 +227,6 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button(
             "Misc Settings", f"userset {user_id} advanced", position="l_body"
         )
-
         if user_dict and any(
             key in user_dict
             for key in list(user_settings_text.keys())
@@ -216,6 +239,7 @@ async def get_user_settings(from_user, stype="main"):
                 "HYBRID_LEECH",
                 "STOP_DUPLICATE",
                 "DEFAULT_UPLOAD",
+                # Add other potentially user-settable keys here if they aren't in user_settings_text
             ]
         ):
             buttons.data_button(
@@ -224,13 +248,11 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button("Close", f"userset {user_id} close", position="footer")
 
         text = f"""⌬ <b>User Settings :</b>
-
 ╭ <b>Name</b> → {user_name}
 ┊ <b>UserID</b> → #ID{user_id}
 ┊ <b>Username</b> → @{from_user.username}
 ┊ <b>Telegram DC</b> → {from_user.dc_id}
 ╰ <b>Telegram Lang</b> → {Language.get(lc).display_name() if (lc := from_user.language_code) else "N/A"}"""
-
         btns = buttons.build_menu(2)
 
     elif stype == "general":
@@ -243,7 +265,6 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button(
             f"Swap to {dur} Mode", f"userset {user_id} {default_upload}"
         )
-
         user_tokens = user_dict.get("USER_TOKENS", False)
         tr = "USER" if user_tokens else "OWNER"
         trr = "OWNER" if user_tokens else "USER"
@@ -251,18 +272,17 @@ async def get_user_settings(from_user, stype="main"):
             f"Swap to {trr} token/config",
             f"userset {user_id} tog USER_TOKENS {'f' if user_tokens else 't'}",
         )
-
         buttons.data_button("Back", f"userset {user_id} back", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
-
+        
         use_user_cookie = user_dict.get("USE_USER_COOKIE", False)
         cookie_mode = "USER's" if use_user_cookie else "OWNER's"
         buttons.data_button(
             f"Swap to {'OWNER' if use_user_cookie else 'USER'}'s Cookie",
             f"userset {user_id} tog USE_USER_COOKIE {'f' if use_user_cookie else 't'}",
         )
-        btns = buttons.build_menu(1)
 
+        btns = buttons.build_menu(1)
         text = f"""⌬ <b>General Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ┊ <b>Default Upload Package</b> → <b>{du}</b>
@@ -271,9 +291,6 @@ async def get_user_settings(from_user, stype="main"):
 """
 
     elif stype == "leech":
-        thumbpath = f"thumbnails/{user_id}.jpg"
-        buttons.data_button("Thumbnail", f"userset {user_id} menu THUMBNAIL")
-        thumbmsg = "Exists" if await aiopath.exists(thumbpath) else "Not Exists"
         buttons.data_button(
             "Leech Split Size", f"userset {user_id} menu LEECH_SPLIT_SIZE"
         )
@@ -304,7 +321,6 @@ async def get_user_settings(from_user, stype="main"):
             lsuffix = Config.LEECH_SUFFIX
         else:
             lsuffix = "Not Exists"
-
         buttons.data_button("Leech Caption", f"userset {user_id} menu LEECH_CAPTION")
         if user_dict.get("LEECH_CAPTION", False):
             lcap = user_dict["LEECH_CAPTION"]
@@ -325,6 +341,7 @@ async def get_user_settings(from_user, stype="main"):
             buttons.data_button(
                 "Send As Document", f"userset {user_id} tog AS_DOCUMENT t"
             )
+
         if (
             user_dict.get("EQUAL_SPLITS", False)
             or "EQUAL_SPLITS" not in user_dict
@@ -339,6 +356,7 @@ async def get_user_settings(from_user, stype="main"):
                 "Enable Equal Splits", f"userset {user_id} tog EQUAL_SPLITS t"
             )
             equal_splits = "Disabled"
+
         if (
             user_dict.get("MEDIA_GROUP", False)
             or "MEDIA_GROUP" not in user_dict
@@ -353,6 +371,7 @@ async def get_user_settings(from_user, stype="main"):
                 "Enable Media Group", f"userset {user_id} tog MEDIA_GROUP t"
             )
             media_group = "Disabled"
+
         if (
             TgClient.IS_PREMIUM_USER
             and user_dict.get("USER_TRANSMISSION", False)
@@ -389,6 +408,33 @@ async def get_user_settings(from_user, stype="main"):
         else:
             hybrid_leech = "Disabled"
 
+        # NEW: Thumbnails Option Button
+        buttons.data_button(
+            "Thumbnails Option", f"userset {user_id} thumb_options"
+        )
+        buttons.data_button("Back", f"userset {user_id} back", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer")
+
+        btns = buttons.build_menu(2)
+        text = f"""⌬ <b>Leech Settings :</b>
+╭ <b>Name</b> → {user_name}
+┊ Leech Type → <b>{ltype}</b>
+┊ Leech Split Size → <b>{get_readable_file_size(split_size)}</b>
+┊ Equal Splits → <b>{equal_splits}</b>
+┊ Media Group → <b>{media_group}</b>
+┊ Leech Prefix → <code>{escape(lprefix)}</code>
+┊ Leech Suffix → <code>{escape(lsuffix)}</code>
+┊ Leech Caption → <code>{escape(lcap)}</code>
+┊ Leech Destination → <code>{leech_dest}</code>
+┊ Leech by <b>{leech_method}</b> session
+╰ Mixed Leech → <b>{hybrid_leech}</b>
+"""
+
+    elif stype == "thumb_options":
+        # NEW: Thumbnails Options Sub-Menu
+        thumbpath = f"thumbnails/{user_id}.jpg"
+        thumbmsg = "Exists" if await aiopath.exists(thumbpath) else "Not Exists"
+        buttons.data_button("Set Thumbnail", f"userset {user_id} menu THUMBNAIL")
         buttons.data_button(
             "Thumbnail Layout", f"userset {user_id} menu THUMBNAIL_LAYOUT"
         )
@@ -399,24 +445,46 @@ async def get_user_settings(from_user, stype="main"):
         else:
             thumb_layout = "None"
 
-        buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
-        btns = buttons.build_menu(2)
+        # Grid Thumbnail Toggle
+        if (
+            user_dict.get("USE_GRID_THUMBNAIL", False)
+            or "USE_GRID_THUMBNAIL" not in user_dict
+            and Config.USE_GRID_THUMBNAIL
+        ):
+            buttons.data_button(
+                "Disable Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL f"
+            )
+            grid_thumb = "Enabled"
+        else:
+            buttons.data_button(
+                "Enable Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL t"
+            )
+            grid_thumb = "Disabled"
 
-        text = f"""⌬ <b>Leech Settings :</b>
+        # Grid Layout (only show if grid is enabled)
+        if grid_thumb == "Enabled":
+            buttons.data_button(
+                "Grid Layout", f"userset {user_id} menu GRID_THUMBNAIL_LAYOUT"
+            )
+            if user_dict.get("GRID_THUMBNAIL_LAYOUT", False):
+                grid_layout = user_dict["GRID_THUMBNAIL_LAYOUT"]
+            elif "GRID_THUMBNAIL_LAYOUT" not in user_dict and Config.GRID_THUMBNAIL_LAYOUT:
+                grid_layout = Config.GRID_THUMBNAIL_LAYOUT
+            else:
+                grid_layout = "2x3"
+        else:
+            grid_layout = "N/A"
+
+        buttons.data_button("Back", f"userset {user_id} leech", "footer")
+        buttons.data_button("Close", f"userset {user_id} close", "footer")
+
+        btns = buttons.build_menu(2)
+        text = f"""⌬ <b>Thumbnails Settings :</b>
 ╭ <b>Name</b> → {user_name}
-┊ Leech Type → <b>{ltype}</b>
 ┊ Custom Thumbnail → <b>{thumbmsg}</b>
-┊ Leech Split Size → <b>{get_readable_file_size(split_size)}</b>
-┊ Equal Splits → <b>{equal_splits}</b>
-┊ Media Group → <b>{media_group}</b>
-┊ Leech Prefix → <code>{escape(lprefix)}</code>
-┊ Leech Suffix → <code>{escape(lsuffix)}</code>
-┊ Leech Caption → <code>{escape(lcap)}</code>
-┊ Leech Destination → <code>{leech_dest}</code>
-┊ Leech by <b>{leech_method}</b> session
-┊ Mixed Leech → <b>{hybrid_leech}</b>
-╰ Thumbnail Layout → <b>{thumb_layout}</b>
+┊ Thumbnail Layout → <b>{thumb_layout}</b>
+┊ Grid Thumbnail → <b>{grid_thumb}</b>
+╰ Grid Layout → <b>{grid_layout}</b>
 """
 
     elif stype == "rclone":
@@ -425,7 +493,6 @@ async def get_user_settings(from_user, stype="main"):
             "Default Rclone Path", f"userset {user_id} menu RCLONE_PATH"
         )
         buttons.data_button("Rclone Flags", f"userset {user_id} menu RCLONE_FLAGS")
-
         buttons.data_button("Back", f"userset {user_id} back mirror", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
 
@@ -436,8 +503,8 @@ async def get_user_settings(from_user, stype="main"):
             rccpath = Config.RCLONE_PATH
         else:
             rccpath = "None"
-        btns = buttons.build_menu(1)
 
+        btns = buttons.build_menu(1)
         if user_dict.get("RCLONE_FLAGS", False):
             rcflags = user_dict["RCLONE_FLAGS"]
         elif "RCLONE_FLAGS" not in user_dict and Config.RCLONE_FLAGS:
@@ -455,6 +522,7 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button("token.pickle", f"userset {user_id} menu TOKEN_PICKLE")
         buttons.data_button("Default Gdrive ID", f"userset {user_id} menu GDRIVE_ID")
         buttons.data_button("Index URL", f"userset {user_id} menu INDEX_URL")
+
         if (
             user_dict.get("STOP_DUPLICATE", False)
             or "STOP_DUPLICATE" not in user_dict
@@ -471,6 +539,7 @@ async def get_user_settings(from_user, stype="main"):
                 "l_body",
             )
             sd_msg = "Disabled"
+
         buttons.data_button("Back", f"userset {user_id} back mirror", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
 
@@ -482,14 +551,15 @@ async def get_user_settings(from_user, stype="main"):
         else:
             gdrive_id = "None"
         index = user_dict["INDEX_URL"] if user_dict.get("INDEX_URL", False) else "None"
-        btns = buttons.build_menu(2)
 
+        btns = buttons.build_menu(2)
         text = f"""⌬ <b>GDrive Tools Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ┊ <b>Gdrive Token</b> → <b>{tokenmsg}</b>
 ┊ <b>Gdrive ID</b> → <code>{gdrive_id}</code>
 ┊ <b>Index URL</b> → <code>{index}</code>
 ╰ <b>Stop Duplicate</b> → <b>{sd_msg}</b>"""
+
     elif stype == "mirror":
         buttons.data_button("RClone Tools", f"userset {user_id} rclone")
         rccmsg = "Exists" if await aiopath.exists(rclone_conf) else "Not Exists"
@@ -508,8 +578,8 @@ async def get_user_settings(from_user, stype="main"):
             gdrive_id = GI
         else:
             gdrive_id = "None"
-
         index = user_dict["INDEX_URL"] if user_dict.get("INDEX_URL", False) else "None"
+
         if (
             user_dict.get("STOP_DUPLICATE", False)
             or "STOP_DUPLICATE" not in user_dict
@@ -521,8 +591,8 @@ async def get_user_settings(from_user, stype="main"):
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
-        btns = buttons.build_menu(1)
 
+        btns = buttons.build_menu(1)
         text = f"""⌬ <b>Mirror Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ┊ <b>Rclone Config</b> → <b>{rccmsg}</b>
@@ -541,7 +611,6 @@ async def get_user_settings(from_user, stype="main"):
             ffc = Config.FFMPEG_CMDS
         else:
             ffc = "<b>Not Exists</b>"
-
         if isinstance(ffc, dict):
             ffc = "\n" + "\n".join(
                 [
@@ -552,8 +621,8 @@ async def get_user_settings(from_user, stype="main"):
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
-        btns = buttons.build_menu(2)
 
+        btns = buttons.build_menu(2)
         text = f"""⌬ <b>FF Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ╰ <b>FFmpeg Commands</b> → {ffc}"""
@@ -568,7 +637,6 @@ async def get_user_settings(from_user, stype="main"):
             ex_ex = excluded_extensions
         else:
             ex_ex = "None"
-
         if ex_ex != "None":
             ex_ex = ", ".join(ex_ex)
 
@@ -604,8 +672,8 @@ async def get_user_settings(from_user, stype="main"):
 
         buttons.data_button("Back", f"userset {user_id} back", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
-        btns = buttons.build_menu(1)
 
+        btns = buttons.build_menu(1)
         text = f"""⌬ <b>Advanced Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ┊ <b>Name Swaps</b> → {ns_msg}
@@ -705,13 +773,18 @@ async def set_option(_, message, option, rfunc):
         if not value.isdigit():
             value = get_size_bytes(value)
         value = min(int(value), TgClient.MAX_SPLIT_SIZE)
-    # elif option == "LEECH_DUMP_CHAT": # TODO: Add
+    # elif option == "LEECH_DUMP_CHAT": # TODO: Add logic if needed, e.g., parsing chat ID/username
     elif option == "EXCLUDED_EXTENSIONS":
         fx = value.split()
-        value = ["aria2", "!qB"]
+        value = ["aria2", "!qB"] # Default values
         for x in fx:
-            x = x.lstrip(".")
-            value.append(x.strip().lower())
+            x = x.lstrip(".") # Remove leading dot
+            value.append(x.strip().lower()) # Normalize and add
+    elif option in ["THUMBNAIL_LAYOUT", "GRID_THUMBNAIL_LAYOUT"]:
+        # Validate layout format (e.g., "2x3", "3x3")
+        if not re_match(r"^\d+x\d+$", value):
+            await send_message(message, "Invalid format! Use format like: 2x3, 3x3, 3x2")
+            return
     elif option in ["UPLOAD_PATHS", "FFMPEG_CMDS", "YT_DLP_OPTIONS"]:
         if value.startswith("{") and value.endswith("}"):
             try:
@@ -731,23 +804,24 @@ async def set_option(_, message, option, rfunc):
 async def get_menu(option, message, user_id):
     handler_dict[user_id] = False
     user_dict = user_data.get(user_id, {})
-
     file_dict = {
         "THUMBNAIL": f"thumbnails/{user_id}.jpg",
         "RCLONE_CONFIG": f"rclone/{user_id}.conf",
         "TOKEN_PICKLE": f"tokens/{user_id}.pickle",
         "USER_COOKIE_FILE": f"cookies/{user_id}/cookies.txt",
     }
-
     buttons = ButtonMaker()
+
     if option in ["THUMBNAIL", "RCLONE_CONFIG", "TOKEN_PICKLE", "USER_COOKIE_FILE"]:
         key = "file"
     else:
         key = "set"
+
     buttons.data_button(
         "Change" if user_dict.get(option, False) else "Set",
         f"userset {user_id} {key} {option}",
     )
+
     if user_dict.get(option, False):
         if option == "THUMBNAIL":
             buttons.data_button(
@@ -760,13 +834,13 @@ async def get_menu(option, message, user_id):
             buttons.data_button(
                 "Remove One", f"userset {user_id} rmone {option}", "header"
             )
-
-        if key != "file":  # TODO: option default val check
+        if key != "file":  # TODO: option default val check - Consider removing if always true for non-file options
             buttons.data_button("Reset", f"userset {user_id} reset {option}")
-        elif await aiopath.exists(file_dict[option]):
-            buttons.data_button("Remove", f"userset {user_id} remove {option}")
+    elif await aiopath.exists(file_dict.get(option, "")): # Use get with default empty string
+        buttons.data_button("Remove", f"userset {user_id} remove {option}")
+
     if option in leech_options:
-        back_to = "leech"
+        back_to = "thumb_options"  # MODIFIED: Back to thumb_options for thumbnail settings
     elif option in rclone_options:
         back_to = "rclone"
     elif option in gdrive_options:
@@ -777,19 +851,23 @@ async def get_menu(option, message, user_id):
         back_to = "advanced"
     else:
         back_to = "back"
+
     buttons.data_button("Back", f"userset {user_id} {back_to}", "footer")
     buttons.data_button("Close", f"userset {user_id} close", "footer")
+
     val = user_dict.get(option)
     if option in file_dict and await aiopath.exists(file_dict[option]):
         val = "<b>Exists</b>"
     elif option == "LEECH_SPLIT_SIZE":
         val = get_readable_file_size(val)
-    text = f"""⌬ <b><u>Menu Settings :</u></b>
 
+    # Safely get description texts, defaulting to generic messages if key is missing
+    desc_tuple = user_settings_text.get(option, ("", "", ""))
+    text = f"""⌬ <b><u>Menu Settings :</u></b>
 ╭ <b>Option</b> → {option}
 ┊ <b>Option's Value</b> → {val if val else "<b>Not Exists</b>"}
-┊ <b>Default Input Type</b> → {user_settings_text[option][0]}
-╰ <b>Description</b> → {user_settings_text[option][1]}
+┊ <b>Default Input Type</b> → {desc_tuple[0] if desc_tuple[0] else "Text/Dict/File"}
+╰ <b>Description</b> → {desc_tuple[1] if desc_tuple[1] else "Set the value for this option."}
 """
     await edit_message(message, text, buttons.build_menu(2))
 
@@ -801,7 +879,7 @@ async def event_handler(client, query, pfunc, rfunc, photo=False, document=False
 
     async def event_filter(_, __, event):
         if photo:
-            mtype = event.photo or event.document
+            mtype = event.photo or event.document # Accept photo or doc for thumbnail
         elif document:
             mtype = event.document
         else:
@@ -814,7 +892,6 @@ async def event_handler(client, query, pfunc, rfunc, photo=False, document=False
     handler = client.add_handler(
         MessageHandler(pfunc, filters=create(event_filter)), group=-1
     )
-
     while handler_dict[user_id]:
         await sleep(0.5)
         if time() - start_time > 60:
@@ -838,14 +915,13 @@ async def edit_user_settings(client, query):
     name = from_user.mention
     message = query.message
     data = query.data.split()
-
     handler_dict[user_id] = False
     thumb_path = f"thumbnails/{user_id}.jpg"
     rclone_conf = f"rclone/{user_id}.conf"
     token_pickle = f"tokens/{user_id}.pickle"
     yt_cookie_path = f"cookies/{user_id}/cookies.txt"
-
     user_dict = user_data.get(user_id, {})
+
     if user_id != int(data[1]):
         return await query.answer("Not Yours!", show_alert=True)
     elif data[2] == "setevent":
@@ -858,6 +934,7 @@ async def edit_user_settings(client, query):
         "advanced",
         "gdrive",
         "rclone",
+        "thumb_options",  # NEW
     ]:
         await query.answer()
         await update_user_settings(query, data[2])
@@ -871,6 +948,8 @@ async def edit_user_settings(client, query):
             back_to = "gdrive"
         elif data[3] in ["USER_TOKENS", "USE_USER_COOKIE"]:
             back_to = "general"
+        elif data[3] == "USE_GRID_THUMBNAIL":  # NEW
+            back_to = "thumb_options"
         else:
             back_to = "leech"
         await update_user_settings(query, stype=back_to)
@@ -878,12 +957,13 @@ async def edit_user_settings(client, query):
     elif data[2] == "file":
         await query.answer()
         buttons = ButtonMaker()
-        text = user_settings_text[data[3]][2]
+        # Safely get the instruction text, defaulting if key is missing
+        text_desc = user_settings_text.get(data[3], ("", "", "<i>No instructions available.</i>\n" "╰ <b>Time Left :</b> <code>60 sec</code>"))[2]
         buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop")
         buttons.data_button("Back", f"userset {user_id} menu {data[3]}", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
         await edit_message(
-            message, message.text.html + "\n\n" + text, buttons.build_menu(1)
+            message, message.text.html + "\n" + text_desc, buttons.build_menu(1)
         )
         rfunc = partial(get_menu, data[3], message, user_id)
         pfunc = partial(add_file, ftype=data[3], rfunc=rfunc)
@@ -899,19 +979,20 @@ async def edit_user_settings(client, query):
         await query.answer()
         buttons = ButtonMaker()
         if data[2] == "set":
-            text = user_settings_text[data[3]][2]
+            # Safely get the instruction text
+            text_desc = user_settings_text.get(data[3], ("", "", "<i>No instructions available.</i>\n" "╰ <b>Time Left :</b> <code>60 sec</code>"))[2]
             func = set_option
         elif data[2] == "addone":
-            text = f"Add one or more string key and value to {data[3]}. Example: {{'key 1': 62625261, 'key 2': 'value 2'}}. Timeout: 60 sec"
+            text_desc = f"Add one or more string key and value to {data[3]}. Example: {{'key 1': 62625261, 'key 2': 'value 2'}}. Timeout: 60 sec"
             func = add_one
         elif data[2] == "rmone":
-            text = f"Remove one or more key from {data[3]}. Example: key 1/key2/key 3. Timeout: 60 sec"
+            text_desc = f"Remove one or more key from {data[3]}. Example: key 1/key2/key 3. Timeout: 60 sec"
             func = remove_one
         buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop")
         buttons.data_button("Back", f"userset {user_id} menu {data[3]}", "footer")
         buttons.data_button("Close", f"userset {user_id} close", "footer")
         await edit_message(
-            message, message.text.html + "\n\n" + text, buttons.build_menu(1)
+            message, message.text.html + "\n" + text_desc, buttons.build_menu(1)
         )
         rfunc = partial(get_menu, data[3], message, user_id)
         pfunc = partial(func, option=data[3], rfunc=rfunc)
@@ -929,7 +1010,9 @@ async def edit_user_settings(client, query):
                 fpath = token_pickle
             if await aiopath.exists(fpath):
                 await remove(fpath)
-            del user_dict[data[3]]
+            # Only remove from user_dict if key exists there
+            if data[3] in user_dict:
+                 del user_dict[data[3]]
             await database.update_user_doc(user_id, data[3])
         else:
             update_user_ldata(user_id, data[3], "")
@@ -939,16 +1022,17 @@ async def edit_user_settings(client, query):
         await query.answer("Reset Done!", show_alert=True)
         if data[3] in user_dict:
             del user_dict[data[3]]
-            await get_menu(data[3], message, user_id)
-        else:
-            for k in list(user_dict.keys()):
-                if k not in ("SUDO", "AUTH", "VERIFY_TOKEN", "VERIFY_TIME"):
-                    del user_dict[k]
-            for fpath in [thumb_path, rclone_conf, token_pickle, yt_cookie_path]:
-                if await aiopath.exists(fpath):
-                    await remove(fpath)
-            await update_user_settings(query)
-        await database.update_user_data(user_id)
+        await get_menu(data[3], message, user_id)
+    elif data[2] == "resetall": # Added for completeness if 'reset all' button uses this handler
+         await query.answer("Reset All Done!", show_alert=True)
+         for k in list(user_dict.keys()):
+             if k not in ("SUDO", "AUTH", "VERIFY_TOKEN", "VERIFY_TIME"): # Exclude critical keys
+                 del user_dict[k]
+         for fpath in [thumb_path, rclone_conf, token_pickle, yt_cookie_path]:
+             if await aiopath.exists(fpath):
+                 await remove(fpath)
+         await update_user_settings(query)
+         await database.update_user_data(user_id)
     elif data[2] == "view":
         await query.answer()
         await send_file(message, thumb_path, name)
@@ -973,7 +1057,7 @@ async def get_users_settings(_, message):
     if auth_chats:
         msg += f"AUTHORIZED_CHATS: {auth_chats}\n"
     if sudo_users:
-        msg += f"SUDO_USERS: {sudo_users}\n\n"
+        msg += f"SUDO_USERS: {sudo_users}\n"
     if user_data:
         for u, d in user_data.items():
             kmsg = f"\n<b>{u}:</b>\n"
@@ -981,15 +1065,13 @@ async def get_users_settings(_, message):
                 f"{k}: <code>{v or None}</code>\n" for k, v in d.items()
             ):
                 msg += kmsg + vmsg
-        if not msg:
-            await send_message(message, "No users data!")
-            return
-        msg_ecd = msg.encode()
-        if len(msg_ecd) > 4000:
-            with BytesIO(msg_ecd) as ofile:
-                ofile.name = "users_settings.txt"
-                await send_file(message, ofile)
-        else:
-            await send_message(message, msg)
-    else:
+    if not msg:
         await send_message(message, "No users data!")
+        return
+    msg_ecd = msg.encode()
+    if len(msg_ecd) > 4000:
+        with BytesIO(msg_ecd) as ofile:
+            ofile.name = "users_settings.txt"
+            await send_file(message, ofile)
+    else:
+        await send_message(message, msg)
