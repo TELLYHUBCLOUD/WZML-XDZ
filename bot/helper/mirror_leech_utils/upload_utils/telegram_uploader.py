@@ -121,17 +121,17 @@ class TelegramUploader:
 
         # Check for split file patterns
         # Pattern 1: filename.ext.001, filename.ext.002, etc.
-        match = re.match(r"(.+\.\w+)\.(\d{3})$", filename)
+        match = re_match(r"(.+\.\w+)\.(\d{3})$", filename)
         if match:
             return match.group(1)  # Return filename.ext without the .001 part
 
         # Pattern 2: filename.part001.ext, filename.part002.ext, etc.
-        match = re.match(r"(.+)\.part\d+(\.\w+)$", filename)
+        match = re_match(r"(.+)\.part\d+(\.\w+)$", filename)
         if match:
             return f"{match.group(1)}{match.group(2)}"  # Return filename.ext without the .part001 part
 
         # Pattern 3: filename.001, filename.002 (no extension before split number)
-        match = re.match(r"(.+)\.(\d{3})$", filename)
+        match = re_match(r"(.+)\.(\d{3})$", filename)
         if match:
             # This is trickier - we need to guess the original extension
             # For now, return the base name and let the auto thumbnail helper handle it
