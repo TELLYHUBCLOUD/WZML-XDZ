@@ -327,7 +327,7 @@ async def get_user_settings(from_user, stype="main"):
             grid_thumb = "Enabled"
         else:
             buttons.data_button(
-                "✔ Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL t"
+                "✓ Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL t"
             )
             grid_thumb = "Disabled"
 
@@ -370,7 +370,7 @@ async def get_user_settings(from_user, stype="main"):
             auto_thumb = "Enabled"
         else:
             buttons.data_button(
-                "✔ Auto Thumbnail", f"userset {user_id} tog AUTO_THUMBNAIL t"
+                "✓ Auto Thumbnail", f"userset {user_id} tog AUTO_THUMBNAIL t"
             )
             auto_thumb = "Disabled"
 
@@ -386,7 +386,7 @@ async def get_user_settings(from_user, stype="main"):
             tmdb_enabled = "Yes"
         else:
             buttons.data_button(
-                "✔ TMDB Enabled", f"userset {user_id} tog TMDB_ENABLED t"
+                "✓ TMDB Enabled", f"userset {user_id} tog TMDB_ENABLED t"
             )
             tmdb_enabled = "No"
 
@@ -402,7 +402,7 @@ async def get_user_settings(from_user, stype="main"):
             imdb_enabled = "Yes"
         else:
             buttons.data_button(
-                "✔ IMDB Enabled", f"userset {user_id} tog IMDB_ENABLED t"
+                "✓ IMDB Enabled", f"userset {user_id} tog IMDB_ENABLED t"
             )
             imdb_enabled = "No"
 
@@ -418,7 +418,7 @@ async def get_user_settings(from_user, stype="main"):
             tmdb_adult = "Allowed"
         else:
             buttons.data_button(
-                "✔ Adult Content", f"userset {user_id} tog TMDB_ADULT_CONTENT t"
+                "✓ Adult Content", f"userset {user_id} tog TMDB_ADULT_CONTENT t"
             )
             tmdb_adult = "Blocked"
 
@@ -596,7 +596,7 @@ async def get_user_settings(from_user, stype="main"):
             ayt_status = "Enabled"
         else:
             buttons.data_button(
-                "✔ Auto YT Leech",
+                "✓ Auto YT Leech",
                 f"userset {user_id} tog AUTO_YT_LEECH t",
             )
             ayt_status = "Disabled"
@@ -609,7 +609,7 @@ async def get_user_settings(from_user, stype="main"):
             al_status = "Enabled"
         else:
             buttons.data_button(
-                "✔ Auto Leech",
+                "✓ Auto Leech",
                 f"userset {user_id} tog AUTO_LEECH t",
             )
             al_status = "Disabled"
@@ -622,7 +622,7 @@ async def get_user_settings(from_user, stype="main"):
             am_status = "Enabled"
         else:
             buttons.data_button(
-                "✔ Auto Mirror",
+                "✓ Auto Mirror",
                 f"userset {user_id} tog AUTO_MIRROR t",
             )
             am_status = "Disabled"
@@ -659,7 +659,7 @@ If only Auto YT Leech is enabled, only video URLs are processed.</i>"""
             ar_status = "Enabled"
         else:
             buttons.data_button(
-                "✔ Auto Rename",
+                "✓ Auto Rename",
                 f"userset {user_id} tog AUTO_RENAME t",
             )
             ar_status = "Disabled"
