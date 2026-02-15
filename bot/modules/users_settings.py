@@ -22,6 +22,7 @@ from ..helper.ext_utils.bot_utils import (
 from ..helper.ext_utils.db_handler import database
 from ..helper.ext_utils.media_utils import create_thumb
 from ..helper.telegram_helper.button_build import ButtonMaker
+from ..helper.telly_utils.help_messages import user_settings_text
 from ..helper.telegram_helper.message_utils import (
     delete_message,
     edit_message,
@@ -30,25 +31,41 @@ from ..helper.telegram_helper.message_utils import (
 )
 
 handler_dict = {}
-
+no_thumb = "https://ibb.co/Ng04vGdM"
 leech_options = [
-    "THUMBNAIL",
     "LEECH_SPLIT_SIZE",
     "LEECH_DUMP_CHAT",
     "LEECH_PREFIX",
     "LEECH_SUFFIX",
     "LEECH_CAPTION",
+]
+thumb_options = [
+    "THUMBNAIL",
     "THUMBNAIL_LAYOUT",
     "USE_GRID_THUMBNAIL",
     "GRID_THUMBNAIL_LAYOUT",
 ]
-
-rclone_options = ["RCLONE_CONFIG", "RCLONE_PATH", "RCLONE_FLAGS"]
-
-gdrive_options = ["TOKEN_PICKLE", "GDRIVE_ID", "INDEX_URL"]
-
-ffset_options = ["FFMPEG_CMDS"] # Typo? Perhaps 'ff_options'
-
+tmdb_options = [
+    "AUTO_THUMBNAIL",
+    "TMDB_API_KEY",
+    "TMDB_ENABLED",
+    "IMDB_ENABLED",
+    "TMDB_LANGUAGE",
+    "TMDB_ADULT_CONTENT",
+]
+rclone_options = [
+    "RCLONE_CONFIG", 
+    "RCLONE_PATH", 
+    "RCLONE_FLAGS"
+    ]
+gdrive_options = [
+    "TOKEN_PICKLE", 
+    "GDRIVE_ID", 
+    "INDEX_URL"
+    ]
+ffset_options = [
+    "FFMPEG_CMDS"
+    ]
 advanced_options = [
     "EXCLUDED_EXTENSIONS",
     "NAME_SWAP",
@@ -56,159 +73,12 @@ advanced_options = [
     "UPLOAD_PATHS",
     "USER_COOKIE_FILE",
 ]
-
-# Ensure all options used in menus/submenus are defined here for descriptions.
-user_settings_text = {
-    "THUMBNAIL": (
-        "Photo or Doc",
-        "Custom Thumbnail is used as the thumbnail for the files you upload to telegram in media or document mode.",
-        "<i>Send a photo to save it as custom thumbnail.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "RCLONE_CONFIG": (
-        "",
-        "",
-        "<i>Send your <code>rclone.conf</code> file to use as your Upload Dest to RClone.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "TOKEN_PICKLE": (
-        "",
-        "",
-        "<i>Send your <code>token.pickle</code> to use as your Upload Dest to GDrive</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "LEECH_SPLIT_SIZE": (
-        "",
-        "",
-        f"Send Leech split size in bytes or use gb or mb. Example: 40000000 or 2.5gb or 1000mb. PREMIUM_USER: {TgClient.IS_PREMIUM_USER}.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "LEECH_DUMP_CHAT": (
-        "",
-        "",
-        """Send leech destination ID/USERNAME/PM.
-* b:id/@username/pm (b: means leech by bot) (id or username of the chat or write pm means private message so bot will send the files in private to you) when you should use b:(leech by bot)? When your default settings is leech by user and you want to leech by bot for specific task.
-* u:id/@username(u: means leech by user) This incase OWNER added USER_STRING_SESSION.
-* h:id/@username(hybrid leech) h: to upload files by bot and user based on file size.
-* id/@username|topic_id(leech in specific chat and topic) add | without space and write topic id after chat id or username.
-╰ <b>Time Left :</b> <code>60 sec</code>""",
-    ),
-    "LEECH_PREFIX": (
-        "",
-        "",
-        "Send Leech Filename Prefix. You can add HTML tags. Example: <code>@mychannel</code>.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "LEECH_SUFFIX": (
-        "",
-        "",
-        "Send Leech Filename Suffix. You can add HTML tags. Example: <code>@mychannel</code>.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "LEECH_CAPTION": (
-        "",
-        "",
-        "Send Leech Caption. You can add HTML tags. Example: <code>@mychannel</code>.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "THUMBNAIL_LAYOUT": (
-        "",
-        "",
-        "Send thumbnail layout (widthxheight, 2x2, 3x3, 2x4, 4x4, ...). Example: 3x3.</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "GRID_THUMBNAIL_LAYOUT": (
-        "",
-        "",
-        "Send grid thumbnail layout (widthxheight, 2x3, 3x3, 3x2, ...). Example: 2x3 (2 columns, 3 rows = 6 frames).</i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "RCLONE_PATH": (
-        "",
-        "",
-        "Send Rclone Path. If you want to use your rclone config edit using owner/user config from usetting or add mrcc: before rclone path. Example mrcc:remote:folder. </i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "RCLONE_FLAGS": (
-        "",
-        "",
-        "key:value|key|key|key:value . Check here all <a href='https://rclone.org/flags/'>RcloneFlags</a>\n"
-        "Ex: --buffer-size:8M|--drive-starred-only",
-    ),
-    "GDRIVE_ID": (
-        "",
-        "",
-        "Send Gdrive ID. If you want to use your token.pickle edit using owner/user token from usetting or add mtp: before the id. Example: mtp:F435RGGRDXXXXXX . </i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "INDEX_URL": (
-        "",
-        "",
-        "Send Index URL for your gdrive option. </i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "UPLOAD_PATHS": (
-        "",
-        "",
-        "Send Dict of keys that have path values. Example: {'path 1': 'remote:rclonefolder', 'path 2': 'gdrive1 id', 'path 3': 'tg chat id', 'path 4': 'mrcc:remote:', 'path 5': b:@username} . </i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "EXCLUDED_EXTENSIONS": (
-        "",
-        "",
-        "Send exluded extenions seperated by space without dot at beginning. </i>\n"
-        "╰ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-    "NAME_SWAP": (
-        "",
-        "",
-        """<i>Send your Name Swap. You can add pattern instead of normal text according to the format.</i>
-<b>Full Documentation Guide</b> <a href="https://t.me/WZML_X/77">Click Here</a>
-╰ <b>Time Left :</b> <code>60 sec</code>
-""",
-    ),
-    "YT_DLP_OPTIONS": (
-        "",
-        "",
-        """Format: {key: value, key: value, key: value}.
-Example: {"format": "bv*+mergeall[vcodec=none]", "nocheckcertificate": True, "playliststart": 10, "fragment_retries": float("inf"), "matchtitle": "S13", "writesubtitles": True, "live_from_start": True, "postprocessor_args": {"ffmpeg": ["-threads", "4"]}, "wait_for_video": (5, 100), "download_ranges": [{"start_time": 0, "end_time": 10}]}
-Check all yt-dlp api options from this <a href='https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/YoutubeDL.py#L184'>FILE</a> or use this <a href='https://t.me/mltb_official_channel/177'>script</a> to convert cli arguments to api options.
-<i>Send dict of YT-DLP Options according to format.</i>
-╰ <b>Time Left :</b> <code>60 sec</code>""",
-    ),
-    "FFMPEG_CMDS": (
-        "",
-        "",
-        """Dict of list values of ffmpeg commands. You can set multiple ffmpeg commands for all files before upload. Don't write ffmpeg at beginning, start directly with the arguments.
-Examples: {"subtitle": ["-i mltb.mkv -c copy -c:s srt mltb.mkv", "-i mltb.video -c copy -c:s srt mltb"], "convert": ["-i mltb.m4a -c:a libmp3lame -q:a 2 mltb.mp3", "-i mltb.audio -c:a libmp3lame -q:a 2 mltb.mp3"], extract: ["-i mltb -map 0:a -c copy mltb.mka -map 0:s -c copy mltb.srt"]}
-Notes:
-- Add `-del` to the list which you want from the bot to delete the original files after command run complete!
-- To execute one of those lists in bot for example, you must use -ff subtitle (list key) or -ff convert (list key)
-Here I will explain how to use mltb.* which is reference to files you want to work on.
-1. First cmd: the input is mltb.mkv so this cmd will work only on mkv videos and the output is mltb.mkv also so all outputs is mkv. -del will delete the original media after complete run of the cmd.
-2. Second cmd: the input is mltb.video so this cmd will work on all videos and the output is only mltb so the extenstion is same as input files.
-3. Third cmd: the input in mltb.m4a so this cmd will work only on m4a audios and the output is mltb.mp3 so the output extension is mp3.
-4. Fourth cmd: the input is mltb.audio so this cmd will work on all audios and the output is mltb.mp3 so the output extension is mp3.
-<i>Send dict of FFMPEG_CMDS Options according to format.</i>
-╰ <b>Time Left :</b> <code>60 sec</code>
-""",
-    ),
-    # "METADATA_CMDS": ( # Uncomment if METADATA_CMDS is used elsewhere
-    #     "",
-    #     "",
-    #     """<i>Send your Meta data. You can according to the format title="Join @WZML_X".</i>
-    # <b>Full Documentation Guide</b> <a href="https://t.me/WZML_X/">Click Here</a>
-    # ╰ <b>Time Left :</b> <code>60 sec</code>
-    # """,
-    # ),
-    "USER_COOKIE_FILE": (
-        "File",
-        "User's YT-DLP Cookie File to authenticate access to websites and youtube.",
-        "<i>Send your cookie file (e.g., cookies.txt).</i>\n"
-        "┖ <b>Time Left :</b> <code>60 sec</code>",
-    ),
-}
-
+rename_options = [
+    "AUTO_RENAME",
+    "RENAME_TEMPLATE",
+    "START_EPISODE",
+    "START_SEASON",
+]
 async def get_user_settings(from_user, stype="main"):
     user_id = from_user.id
     user_name = from_user.mention(style="html")
@@ -216,17 +86,18 @@ async def get_user_settings(from_user, stype="main"):
     rclone_conf = f"rclone/{user_id}.conf"
     token_pickle = f"tokens/{user_id}.pickle"
     user_dict = user_data.get(user_id, {})
+    thumbpath = f"thumbnails/{user_id}.jpg"
+    thumbnail = thumbpath if await aiopath.exists(thumbpath) else no_thumb
 
     if stype == "main":
-        buttons.data_button(
-            "General Settings", f"userset {user_id} general", position="header"
-        )
+        buttons.data_button("General Settings", f"userset {user_id} general", position="header")
         buttons.data_button("Mirror Settings", f"userset {user_id} mirror")
         buttons.data_button("Leech Settings", f"userset {user_id} leech")
+        buttons.data_button("Thumbnails Option", f"userset {user_id} thumb_options")
         buttons.data_button("FF Media Settings", f"userset {user_id} ffset")
-        buttons.data_button(
-            "Misc Settings", f"userset {user_id} advanced", position="l_body"
-        )
+        buttons.data_button("Misc Settings", f"userset {user_id} advanced", position="l_body")
+        buttons.data_button("Auto Leech/Mirror", f"userset {user_id} auto_process", position="l_body")
+        buttons.data_button("Auto Rename", f"userset {user_id} auto_rename", position="l_body")
         if user_dict and any(
             key in user_dict
             for key in list(user_settings_text.keys())
@@ -242,19 +113,28 @@ async def get_user_settings(from_user, stype="main"):
                 # Add other potentially user-settable keys here if they aren't in user_settings_text
             ]
         ):
-            buttons.data_button(
-                "Reset All", f"userset {user_id} reset all", position="footer"
-            )
-        buttons.data_button("Close", f"userset {user_id} close", position="footer")
+        # add auto rename and thumnail status
+            buttons.data_button("Reset All", f"userset {user_id} reset all", position="footer")
+        buttons.data_button("✘", f"userset {user_id} close", position="footer")
+        # Auto Rename status
+        auto_rename_status = ("Enabled" if user_dict.get("AUTO_RENAME", False) else "Disabled")
+        auto_thumnai_status = ("Enabled" if user_dict.get("TMDB_ENABLED", False) else "Disabled")        
+        rename_template = user_dict.get("RENAME_TEMPLATE", "S{season}E{episode}Q{quality}")
+        # Thumbnail status
+        thumbpath = f"thumbnails/{user_id}.jpg"
+        thumbmsg = "Exists" if await aiopath.exists(thumbpath) else "Not Exists"
 
         text = f"""⌬ <b>User Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ┊ <b>UserID</b> → #ID{user_id}
 ┊ <b>Username</b> → @{from_user.username}
 ┊ <b>Telegram DC</b> → {from_user.dc_id}
-╰ <b>Telegram Lang</b> → {Language.get(lc).display_name() if (lc := from_user.language_code) else "N/A"}"""
+┊ <b>Telegram Lang</b> → {Language.get(lc).display_name() if (lc := from_user.language_code) else "N/A"}
+┊ <b>Auto Rename</b> → {auto_rename_status}
+┊ <b>Rename Template</b> → <code>{rename_template}</code>
+┊ <b>Auto Thumnail </b> → {auto_thumnai_status}
+╰ <b>Custom Thumbnail</b> → {thumbmsg}"""
         btns = buttons.build_menu(2)
-
     elif stype == "general":
         if user_dict.get("DEFAULT_UPLOAD", ""):
             default_upload = user_dict["DEFAULT_UPLOAD"]
@@ -272,8 +152,8 @@ async def get_user_settings(from_user, stype="main"):
             f"Swap to {trr} token/config",
             f"userset {user_id} tog USER_TOKENS {'f' if user_tokens else 't'}",
         )
-        buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
         
         use_user_cookie = user_dict.get("USE_USER_COOKIE", False)
         cookie_mode = "USER's" if use_user_cookie else "OWNER's"
@@ -289,7 +169,6 @@ async def get_user_settings(from_user, stype="main"):
 ┊ <b>Default Usage Mode</b> → <b>{tr}'s</b> token/config
 ╰ <b>Cookie Mode</b> → <b>{cookie_mode}</b>
 """
-
     elif stype == "leech":
         buttons.data_button(
             "Leech Split Size", f"userset {user_id} menu LEECH_SPLIT_SIZE"
@@ -408,12 +287,8 @@ async def get_user_settings(from_user, stype="main"):
         else:
             hybrid_leech = "Disabled"
 
-        # NEW: Thumbnails Option Button
-        buttons.data_button(
-            "Thumbnails Option", f"userset {user_id} thumb_options"
-        )
-        buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         btns = buttons.build_menu(2)
         text = f"""⌬ <b>Leech Settings :</b>
@@ -435,16 +310,13 @@ async def get_user_settings(from_user, stype="main"):
         thumbpath = f"thumbnails/{user_id}.jpg"
         thumbmsg = "Exists" if await aiopath.exists(thumbpath) else "Not Exists"
         buttons.data_button("Set Thumbnail", f"userset {user_id} menu THUMBNAIL")
-        buttons.data_button(
-            "Thumbnail Layout", f"userset {user_id} menu THUMBNAIL_LAYOUT"
-        )
+        buttons.data_button("Thumbnail Layout", f"userset {user_id} menu THUMBNAIL_LAYOUT")
         if user_dict.get("THUMBNAIL_LAYOUT", False):
             thumb_layout = user_dict["THUMBNAIL_LAYOUT"]
         elif "THUMBNAIL_LAYOUT" not in user_dict and Config.THUMBNAIL_LAYOUT:
             thumb_layout = Config.THUMBNAIL_LAYOUT
         else:
             thumb_layout = "None"
-
         # Grid Thumbnail Toggle
         if (
             user_dict.get("USE_GRID_THUMBNAIL", False)
@@ -452,12 +324,12 @@ async def get_user_settings(from_user, stype="main"):
             and Config.USE_GRID_THUMBNAIL
         ):
             buttons.data_button(
-                "Disable Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL f"
+                "✘ Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL f"
             )
             grid_thumb = "Enabled"
         else:
             buttons.data_button(
-                "Enable Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL t"
+                "✔ Grid Thumbnail", f"userset {user_id} tog USE_GRID_THUMBNAIL t"
             )
             grid_thumb = "Disabled"
 
@@ -475,8 +347,9 @@ async def get_user_settings(from_user, stype="main"):
         else:
             grid_layout = "N/A"
 
-        buttons.data_button("Back", f"userset {user_id} leech", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("TMDB Settings", f"userset {user_id} tmdb")
+        buttons.data_button("❰", f"userset {user_id} leech", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         btns = buttons.build_menu(2)
         text = f"""⌬ <b>Thumbnails Settings :</b>
@@ -486,6 +359,90 @@ async def get_user_settings(from_user, stype="main"):
 ┊ Grid Thumbnail → <b>{grid_thumb}</b>
 ╰ Grid Layout → <b>{grid_layout}</b>
 """
+    elif stype == "tmdb":
+        # Auto Thumbnail Toggle
+        if (
+            user_dict.get("AUTO_THUMBNAIL", False)
+            or "AUTO_THUMBNAIL" not in user_dict
+            and Config.AUTO_THUMBNAIL
+        ):
+            buttons.data_button(
+                "✘ Auto Thumbnail", f"userset {user_id} tog AUTO_THUMBNAIL f"
+            )
+            auto_thumb = "Enabled"
+        else:
+            buttons.data_button(
+                "✔ Auto Thumbnail", f"userset {user_id} tog AUTO_THUMBNAIL t"
+            )
+            auto_thumb = "Disabled"
+
+        # TMDB Enabled Toggle
+        if (
+            user_dict.get("TMDB_ENABLED", False)
+            or "TMDB_ENABLED" not in user_dict
+            and Config.TMDB_ENABLED
+        ):
+            buttons.data_button(
+                "✘ TMDB Enabled", f"userset {user_id} tog TMDB_ENABLED f"
+            )
+            tmdb_enabled = "Yes"
+        else:
+            buttons.data_button(
+                "✔ TMDB Enabled", f"userset {user_id} tog TMDB_ENABLED t"
+            )
+            tmdb_enabled = "No"
+
+        # IMDB Enabled Toggle
+        if (
+            user_dict.get("IMDB_ENABLED", False)
+            or "IMDB_ENABLED" not in user_dict
+            and Config.IMDB_ENABLED
+        ):
+            buttons.data_button(
+                "✘ IMDB Enabled", f"userset {user_id} tog IMDB_ENABLED f"
+            )
+            imdb_enabled = "Yes"
+        else:
+            buttons.data_button(
+                "✔ IMDB Enabled", f"userset {user_id} tog IMDB_ENABLED t"
+            )
+            imdb_enabled = "No"
+
+        # TMDB Adult Content Toggle
+        if (
+            user_dict.get("TMDB_ADULT_CONTENT", False)
+            or "TMDB_ADULT_CONTENT" not in user_dict
+            and Config.TMDB_ADULT_CONTENT
+        ):
+            buttons.data_button(
+                "✘ Adult Content", f"userset {user_id} tog TMDB_ADULT_CONTENT f"
+            )
+            tmdb_adult = "Allowed"
+        else:
+            buttons.data_button(
+                "✔ Adult Content", f"userset {user_id} tog TMDB_ADULT_CONTENT t"
+            )
+            tmdb_adult = "Blocked"
+
+        buttons.data_button("TMDB API Key", f"userset {user_id} menu TMDB_API_KEY")
+        tmdb_api_key = user_dict.get("TMDB_API_KEY", Config.TMDB_API_KEY) or "Not Set"
+
+        buttons.data_button("TMDB Language", f"userset {user_id} menu TMDB_LANGUAGE")
+        tmdb_language = user_dict.get("TMDB_LANGUAGE", Config.TMDB_LANGUAGE) or "en-US"
+
+        buttons.data_button("❰", f"userset {user_id} thumb_options", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
+
+        btns = buttons.build_menu(2)
+        text = f"""⌬ <b>TMDB Settings :</b>
+╭ <b>Name</b> → {user_name}
+┊ Auto Thumbnail → <b>{auto_thumb}</b>
+┊ TMDB Enabled → <b>{tmdb_enabled}</b>
+┊ IMDB Enabled → <b>{imdb_enabled}</b>
+┊ Adult Content → <b>{tmdb_adult}</b>
+┊ TMDB API Key → <b>{tmdb_api_key}</b>
+╰ TMDB Language → <b>{tmdb_language}</b>
+"""
 
     elif stype == "rclone":
         buttons.data_button("Rclone Config", f"userset {user_id} menu RCLONE_CONFIG")
@@ -493,8 +450,8 @@ async def get_user_settings(from_user, stype="main"):
             "Default Rclone Path", f"userset {user_id} menu RCLONE_PATH"
         )
         buttons.data_button("Rclone Flags", f"userset {user_id} menu RCLONE_FLAGS")
-        buttons.data_button("Back", f"userset {user_id} back mirror", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back mirror", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         rccmsg = "Exists" if await aiopath.exists(rclone_conf) else "Not Exists"
         if user_dict.get("RCLONE_PATH", False):
@@ -540,8 +497,8 @@ async def get_user_settings(from_user, stype="main"):
             )
             sd_msg = "Disabled"
 
-        buttons.data_button("Back", f"userset {user_id} back mirror", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back mirror", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         tokenmsg = "Exists" if await aiopath.exists(token_pickle) else "Not Exists"
         if user_dict.get("GDRIVE_ID", False):
@@ -589,8 +546,8 @@ async def get_user_settings(from_user, stype="main"):
         else:
             sd_msg = "Disabled"
 
-        buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         btns = buttons.build_menu(1)
         text = f"""⌬ <b>Mirror Settings :</b>
@@ -619,13 +576,136 @@ async def get_user_settings(from_user, stype="main"):
                 ]
             )
 
-        buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         btns = buttons.build_menu(2)
         text = f"""⌬ <b>FF Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ╰ <b>FFmpeg Commands</b> → {ffc}"""
+
+    elif stype == "auto_process":
+        # Auto Leech/Mirror/YT Leech settings
+        auto_yt_leech = user_dict.get("AUTO_YT_LEECH", False)
+        auto_leech = user_dict.get("AUTO_LEECH", False)
+        auto_mirror = user_dict.get("AUTO_MIRROR", False)
+        
+        if auto_yt_leech:
+            buttons.data_button(
+                "✘ Auto YT Leech",
+                f"userset {user_id} tog AUTO_YT_LEECH f",
+            )
+            ayt_status = "Enabled"
+        else:
+            buttons.data_button(
+                "✔ Auto YT Leech",
+                f"userset {user_id} tog AUTO_YT_LEECH t",
+            )
+            ayt_status = "Disabled"
+        
+        if auto_leech:
+            buttons.data_button(
+                "✘ Auto Leech",
+                f"userset {user_id} tog AUTO_LEECH f",
+            )
+            al_status = "Enabled"
+        else:
+            buttons.data_button(
+                "✔ Auto Leech",
+                f"userset {user_id} tog AUTO_LEECH t",
+            )
+            al_status = "Disabled"
+        
+        if auto_mirror:
+            buttons.data_button(
+                "✘ Auto Mirror",
+                f"userset {user_id} tog AUTO_MIRROR f",
+            )
+            am_status = "Enabled"
+        else:
+            buttons.data_button(
+                "✔ Auto Mirror",
+                f"userset {user_id} tog AUTO_MIRROR t",
+            )
+            am_status = "Disabled"
+        
+        buttons.data_button("❰", f"userset {user_id} back")
+        buttons.data_button("✘", f"userset {user_id} close")
+        
+        text = f"""<u>Auto Processing Settings for {name}</u>
+
+<b>Auto YT Leech:</b> {ayt_status}
+<b>Auto Leech:</b> {al_status}
+<b>Auto Mirror:</b> {am_status}
+
+<i> Auto YT Leech: Automatically leech YouTube/video URLs only
+ Auto Leech: Automatically leech ALL content (URLs + media)
+ Auto Mirror: Automatically mirror ALL content (URLs + media)
+
+Priority: AUTO_YT_LEECH > AUTO_LEECH > AUTO_MIRROR
+If only Auto YT Leech is enabled, only video URLs are processed.</i>"""
+    elif stype == "auto_rename":
+        # Auto Rename settings
+        auto_rename = user_dict.get("AUTO_RENAME", False)
+        rename_template = user_dict.get(
+            "RENAME_TEMPLATE", "S{season}E{episode}Q{quality}"
+        )
+        start_episode = user_dict.get("START_EPISODE", 1)
+        start_season = user_dict.get("START_SEASON", 1)
+
+        if auto_rename:
+            buttons.data_button(
+                "✘ Auto Rename",
+                f"userset {user_id} tog AUTO_RENAME f",
+            )
+            ar_status = "Enabled"
+        else:
+            buttons.data_button(
+                "✔ Auto Rename",
+                f"userset {user_id} tog AUTO_RENAME t",
+            )
+            ar_status = "Disabled"
+
+        buttons.data_button(
+            "Set Template",
+            f"userset {user_id} menu RENAME_TEMPLATE",
+        )
+        buttons.data_button(
+            "Set Start Episode",
+            f"userset {user_id} menu START_EPISODE",
+        )
+        buttons.data_button(
+            "Set Start Season",
+            f"userset {user_id} menu START_SEASON",
+        )
+        buttons.data_button("❰", f"userset {user_id} back")
+        buttons.data_button("✘", f"userset {user_id} close")
+
+        text = f"""<u>Auto Rename Settings for {name}</u>
+
+<b>Status:</b> {ar_status}
+<b>Template:</b> <code>{rename_template}</code>
+<b>Start Episode:</b> {start_episode}
+<b>Start Season:</b> {start_season}
+
+<b><u>Template Variables (IMDB Integrated):</u></b>
+• <code>{{season}}</code> - Season number
+• <code>{{episode}}</code> - Episode (padded: 01, 02)
+• <code>{{episode2}}</code> - Episode (unpadded: 1, 2)
+• <code>{{quality}}</code> - Video quality (720, 1080)
+• <code>{{audio}}</code> - Audio language or MultiAuD
+• <code>{{title}}</code> - IMDB title
+• <code>{{year}}</code> - Release year
+• <code>{{rating}}</code> - IMDB rating
+• <code>{{genre}}</code> - Genre(s)
+
+<b>Examples:</b>
+<code>S{{season}}E{{episode}}Q{{quality}}</code>
+<code>{{title}} ({{year}}) S{{season}}E{{episode}} [{{quality}}p]</code>
+<code>{{title}}.{{year}}.S{{season}}E{{episode}}.{{quality}}p.{{audio}}</code>
+
+<i>Auto Rename works for both Leech and Mirror operations.
+Automatically fetches IMDB info and renames files using the template.</i>"""
 
     elif stype == "advanced":
         buttons.data_button(
@@ -670,8 +750,8 @@ async def get_user_settings(from_user, stype="main"):
             "YT Cookie File", f"userset {user_id} menu USER_COOKIE_FILE"
         )
 
-        buttons.data_button("Back", f"userset {user_id} back", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("❰", f"userset {user_id} back", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         btns = buttons.build_menu(1)
         text = f"""⌬ <b>Advanced Settings :</b>
@@ -682,12 +762,12 @@ async def get_user_settings(from_user, stype="main"):
 ┊ <b>YT-DLP Options</b> → <code>{ytopt}</code>
 ╰ <b>YT User Cookie File</b> → <b>{user_cookie_msg}</b>"""
 
-    return text, btns
+    return text, btns, thumbnail
 
 
 async def update_user_settings(query, stype="main"):
     handler_dict[query.from_user.id] = False
-    msg, button = await get_user_settings(query.from_user, stype)
+    msg, button, thumbnail = await get_user_settings(query.from_user, stype)
     await edit_message(query.message, msg, button)
 
 
@@ -695,8 +775,8 @@ async def update_user_settings(query, stype="main"):
 async def send_user_settings(_, message):
     from_user = message.from_user
     handler_dict[from_user.id] = False
-    msg, button = await get_user_settings(from_user)
-    await send_message(message, msg, button)
+    msg, button, thumbnail = await get_user_settings(from_user)
+    await send_message(message, msg, button, photo=thumbnail)
 
 
 @new_task
@@ -792,9 +872,40 @@ async def set_option(_, message, option, rfunc):
             except Exception as e:
                 await send_message(message, str(e))
                 return
-        else:
-            await send_message(message, "It must be dict!")
+    elif option in ["START_EPISODE", "START_SEASON"]:
+        if not value.isdigit():
+            await send_message(message, f"{option} must be a positive number!")
             return
+        value = int(value)
+        if value < 1:
+            await send_message(message, f"{option} must be at least 1!")
+            return
+    elif option in ["TMDB_API_KEY", "TMDB_LANGUAGE"]:
+        pass
+    elif option == "RENAME_TEMPLATE":
+        template_vars = [
+            "{name}",
+            "{year}",
+            "{quality}",
+            "{season}",
+            "{episode}",
+            "{audio}",
+        ]
+        has_var = any(var in value for var in template_vars)
+        if not has_var:
+            await send_message(
+                message,
+                f"RENAME_TEMPLATE must contain at least one variable: {', '.join(template_vars)}",
+            )
+            return 
+    elif option == "AUTO_RENAME":
+        if value not in ["True", "False"]:
+            await send_message(message, "AUTO_RENAME must be True or False!")
+            return
+        value = value == "True"           
+    else:
+        await send_message(message, "It must be dict!")
+        return
     update_user_ldata(user_id, option, value)
     await delete_message(message)
     await rfunc()
@@ -849,11 +960,15 @@ async def get_menu(option, message, user_id):
         back_to = "ffset"
     elif option in advanced_options:
         back_to = "advanced"
+    elif option in rename_options:
+        back_to = "auto_rename"
+    elif option in tmdb_options:
+        back_to = "tmdb"        
     else:
         back_to = "back"
 
-    buttons.data_button("Back", f"userset {user_id} {back_to}", "footer")
-    buttons.data_button("Close", f"userset {user_id} close", "footer")
+    buttons.data_button("❰", f"userset {user_id} {back_to}", "footer")
+    buttons.data_button("✘", f"userset {user_id} close", "footer")
 
     val = user_dict.get(option)
     if option in file_dict and await aiopath.exists(file_dict[option]):
@@ -934,7 +1049,8 @@ async def edit_user_settings(client, query):
         "advanced",
         "gdrive",
         "rclone",
-        "thumb_options",  # NEW
+        "thumb_options",
+        "auto_process",  
     ]:
         await query.answer()
         await update_user_settings(query, data[2])
@@ -950,6 +1066,10 @@ async def edit_user_settings(client, query):
             back_to = "general"
         elif data[3] == "USE_GRID_THUMBNAIL":  # NEW
             back_to = "thumb_options"
+        elif data[3] == "AUTO_PROCESS":  # NEW
+            back_to = "auto_process"
+        elif data[3] in tmdb_options:
+            back_to = "tmdb"
         else:
             back_to = "leech"
         await update_user_settings(query, stype=back_to)
@@ -959,9 +1079,9 @@ async def edit_user_settings(client, query):
         buttons = ButtonMaker()
         # Safely get the instruction text, defaulting if key is missing
         text_desc = user_settings_text.get(data[3], ("", "", "<i>No instructions available.</i>\n" "╰ <b>Time Left :</b> <code>60 sec</code>"))[2]
-        buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop")
-        buttons.data_button("Back", f"userset {user_id} menu {data[3]}", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("⬢", f"userset {user_id} menu {data[3]} stop")
+        buttons.data_button("❰", f"userset {user_id} menu {data[3]}", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
         await edit_message(
             message, message.text.html + "\n" + text_desc, buttons.build_menu(1)
         )
@@ -988,9 +1108,9 @@ async def edit_user_settings(client, query):
         elif data[2] == "rmone":
             text_desc = f"Remove one or more key from {data[3]}. Example: key 1/key2/key 3. Timeout: 60 sec"
             func = remove_one
-        buttons.data_button("Stop", f"userset {user_id} menu {data[3]} stop")
-        buttons.data_button("Back", f"userset {user_id} menu {data[3]}", "footer")
-        buttons.data_button("Close", f"userset {user_id} close", "footer")
+        buttons.data_button("⬢", f"userset {user_id} menu {data[3]} stop")
+        buttons.data_button("❰", f"userset {user_id} menu {data[3]}", "footer")
+        buttons.data_button("✘", f"userset {user_id} close", "footer")
         await edit_message(
             message, message.text.html + "\n" + text_desc, buttons.build_menu(1)
         )
@@ -1018,6 +1138,9 @@ async def edit_user_settings(client, query):
             update_user_ldata(user_id, data[3], "")
             await database.update_user_data(user_id)
         await get_menu(data[3], message, user_id)
+    elif data[2] == "tmdb":
+        await query.answer()
+        await update_user_settings(query, "tmdb")
     elif data[2] == "reset":
         await query.answer("Reset Done!", show_alert=True)
         if data[3] in user_dict:

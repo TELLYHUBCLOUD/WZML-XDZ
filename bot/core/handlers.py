@@ -402,6 +402,17 @@ def add_handlers():
             & CustomFilters.authorized,
         )
     )
+    from bot.helper.auto_utils.auto_processor import (
+        AutoProcessor,
+        auto_process_filter,
+    )
+    
+    TgClient.bot.add_handler(
+        MessageHandler(
+            AutoProcessor.process_auto_message,
+            filters=CustomFilters.authorized & auto_process_filter,
+        ),
+    )    
     if Config.SET_COMMANDS:
         global BOT_COMMANDS
 

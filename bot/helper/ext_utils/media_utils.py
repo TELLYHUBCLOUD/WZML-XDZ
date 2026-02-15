@@ -455,6 +455,103 @@ def _process_single_image_with_white_bg(image_path, radius):
             output.save(image_path, "PNG", optimize=True)
     except Exception as e:
         LOGGER.warning(f"Failed to process {image_path} for white-bg rounded corners: {e}")
+
+async def get_media_info(path, enhanced=False):
+    if enhanced:
+        try:
+            result = await cmd_exec(
+                [
+                    "ffprobe",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-print_format",
+                    "json",
+                    "-show_streams",
+                    "-show_format",
+                    path,
+                ],
+            )
+        except Exception as e:
+            LOGGER.error(f"Get Media Info (Enhanced): {e}. File: {path}")
+            return None, None, None, 0
+            
+        if result[0] and result[2] == 0:
+            try:
+                data = eval(result[0])
+                streams = data.get("streams", [])
+                format_info = data.get("format", {})
+                
+                codec = None
+                quality = None
+                language = None
+                duration = 0
+                
+                # Extract duration
+                try:
+                    duration = round(float(format_info.get("duration", 0)))
+                except:
+                    duration = 0
+                
+                # Extract video codec and resolution
+                for stream in streams:
+                    if stream.get("codec_type") == "video":
+                        codec = stream.get("codec_name", "").upper()
+                        height = stream.get("height", 0)
+                        if height:
+                            quality = f"{height}p"
+                        break
+                
+                # Extract audio language
+                audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
+                if audio_streams:
+                    tags = audio_streams[0].get("tags", {})
+                    language = (
+                        tags.get("language") or 
+                        tags.get("LANGUAGE") or 
+                        tags.get("Language") or
+                        "eng"
+                    )
+                
+                return codec, quality, language, duration
+                
+            except Exception as e:
+                LOGGER.error(f"Error parsing enhanced media info: {e}")
+                return None, None, None, 0
+        
+        return None, None, None, 0
+    
+    else:
+        # Legacy mode - original functionality
+        try:
+            result = await cmd_exec(
+                [
+                    "ffprobe",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    path,
+                ],
+            )
+        except Exception as e:
+            LOGGER.error(f"Get Media Info: {e}. Mostly File not found! - File: {path}")
+            return 0, None, None
+        if result[0] and result[2] == 0:
+            fields = eval(result[0]).get("format")
+            if fields is None:
+                LOGGER.error(f"get_media_info: {result}")
+                return 0, None, None
+            duration = round(float(fields.get("duration", 0)))
+            tags = fields.get("tags", {})
+            artist = tags.get("artist") or tags.get("ARTIST") or tags.get("Artist")
+            title = tags.get("title") or tags.get("TITLE") or tags.get("Title")
+            return duration, artist, title
+        return 0, None, None
+
+
 class FFMpeg:
     def __init__(self, listener):
         self._listener = listener

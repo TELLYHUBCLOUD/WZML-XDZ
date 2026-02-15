@@ -1,0 +1,203 @@
+"""
+Auto Leech/Mirror Processor
+Handles automatic processing of links and media files without manual commands
+"""
+import copy
+from pyrogram import filters
+from pyrogram.types import Message
+
+from bot import LOGGER, user_data
+from bot.helper.ext_utils.links_utils import (
+    is_url,
+    is_magnet,
+    is_telegram_link,
+)
+from bot.helper.telegram_helper.bot_commands import BotCommands
+
+
+class AutoProcessor:
+    @staticmethod
+    async def process_auto_message(client, message: Message):
+        user_id = message.from_user.id if message.from_user else None
+        if not user_id:
+            return
+        user_dict = user_data.get(user_id, {})
+        auto_yt_leech = user_dict.get("AUTO_YT_LEECH", False)
+        auto_leech = user_dict.get("AUTO_LEECH", False)
+        auto_mirror = user_dict.get("AUTO_MIRROR", False)
+        if not (auto_yt_leech or auto_leech or auto_mirror):
+            return
+        original_text = message.text
+        original_caption = message.caption
+        try:
+            has_media = bool(
+                message.document or 
+                message.photo or 
+                message.video or 
+                message.audio or 
+                message.voice or 
+                message.video_note or 
+                message.sticker or 
+                message.animation
+            )
+            message_text = message.text or message.caption or ""
+            words = message_text.split()
+            links = []
+            video_links = []
+            regular_links = []
+            video_domains = [
+                'youtube.', 'youtu.be', 'twitter.', 'x.com', 'instagram.',
+                'facebook.', 'vimeo.', 'dailymotion.', 'soundcloud.', 
+                'tiktok.', 'twitch.', 'reddit.com'
+            ]
+            for word in words:
+                if is_url(word) or is_magnet(word) or is_telegram_link(word):
+                    links.append(word)
+                    if any(domain in word.lower() for domain in video_domains):
+                        video_links.append(word)
+                    else:
+                        regular_links.append(word)
+            has_url = len(links) > 0
+            has_video_url = len(video_links) > 0
+            has_regular_url = len(regular_links) > 0
+            if not has_media and not has_url:
+                return
+            if auto_yt_leech and has_video_url:
+                LOGGER.info(f"Auto YT Leech triggered for user {user_id}: Video URL detected")
+            elif auto_yt_leech and has_video_url:
+                LOGGER.info(f"Auto YT Leech triggered for user {user_id}: Video URL detected")
+                await AutoProcessor._process_url(client, message, video_links[0], is_leech=True, force_ytdlp=True)
+            elif has_media and (auto_leech or auto_mirror):
+                is_leech = auto_leech
+                LOGGER.info(f"Auto processing triggered for user {user_id}: Media file detected")
+                await AutoProcessor._process_media(client, message, is_leech)
+            elif has_url and (auto_leech or auto_mirror):
+                is_leech = auto_leech
+                await AutoProcessor._process_url(client, message, links[0], is_leech)
+        except Exception as e:
+            LOGGER.error(f"Auto processing failed for user {user_id}: {e}", exc_info=True)
+        finally:
+            if original_text is not None:
+                message.text = original_text
+            if original_caption is not None:
+                message.caption = original_caption
+    @staticmethod
+    async def _process_media(client, message: Message, is_leech: bool):
+        from bot.modules.mirror_leech import Mirror
+        command_name = BotCommands.LeechCommand[0] if is_leech else BotCommands.MirrorCommand[0]
+        command_text = f"/{command_name}"
+        command_message = copy.copy(message)
+        command_message.text = command_text
+        command_message.caption = None
+        if not hasattr(command_message, '_client') or command_message._client is None:
+            command_message._client = client
+        if not hasattr(command_message, 'client') or command_message.client is None:
+            command_message.client = client
+        command_message.reply_to_message = message
+        command_message.document = None
+        command_message.photo = None
+        command_message.video = None
+        command_message.audio = None
+        command_message.voice = None
+        command_message.video_note = None
+        command_message.sticker = None
+        command_message.animation = None
+        command_message.document = None
+        command_message.photo = None
+        command_message.video = None
+        command_message.audio = None
+        command_message.voice = None
+        command_message.video_note = None
+        command_message.sticker = None
+        command_message.animation = None
+        LOGGER.info(f"Creating Mirror task for media file from user {message.from_user.id}")
+        mirror_task = Mirror(client, command_message, is_qbit=False, is_leech=is_leech)
+        await mirror_task.new_event()
+
+    @staticmethod
+    async def _process_url(client, message: Message, url: str, is_leech: bool, force_ytdlp: bool = False):
+        from bot.modules.mirror_leech import Mirror
+        from bot.modules.ytdlp import YtDlp
+        video_domains = [
+            'youtube.', 'youtu.be', 'twitter.', 'x.com', 'instagram.',
+            'facebook.', 'vimeo.', 'dailymotion.', 'soundcloud.', 
+            'tiktok.', 'twitch.', 'reddit.com'
+        ]
+        is_video_url = any(domain in url.lower() for domain in video_domains)
+        if force_ytdlp:
+            is_video_url = True
+        if is_video_url:
+            command_name = BotCommands.YtdlLeechCommand[0] if is_leech else BotCommands.YtdlCommand[0]
+        else:
+            command_name = BotCommands.LeechCommand[0] if is_leech else BotCommands.MirrorCommand[0]
+        command_text = f"/{command_name} {url}"
+        command_message = copy.copy(message)
+        command_message.text = command_text
+        command_message.caption = None
+        if not hasattr(command_message, '_client') or command_message._client is None:
+            command_message._client = client
+        if not hasattr(command_message, 'client') or command_message.client is None:
+            command_message.client = client
+        command_message.reply_to_message = None
+        command_message.reply_to_message = None
+        command_message.document = None
+        command_message.photo = None
+        command_message.video = None
+        command_message.audio = None
+        command_message.voice = None
+        command_message.video_note = None
+        command_message.sticker = None
+        command_message.animation = None
+        if is_video_url:
+            LOGGER.info(f"Creating YtDlp task for video URL from user {message.from_user.id}")
+            ytdlp_task = YtDlp(client, command_message, is_leech=is_leech)
+            await ytdlp_task.new_event()
+        else:
+            LOGGER.info(f"Creating Mirror task for URL from user {message.from_user.id}")
+            mirror_task = Mirror(client, command_message, is_qbit=False, is_leech=is_leech)
+            await mirror_task.new_event()
+
+
+def auto_message_filter(_, __, message: Message) -> bool:
+    if message.text and message.text.startswith('/'):
+        return False
+    if message.from_user and message.from_user.is_bot:
+        return False
+    if not message.from_user:
+        return False
+    user_id = message.from_user.id
+    user_dict = user_data.get(user_id, {})
+    auto_yt_leech = user_dict.get("AUTO_YT_LEECH", False)
+    auto_leech = user_dict.get("AUTO_LEECH", False)
+    auto_mirror = user_dict.get("AUTO_MIRROR", False)
+    if not (auto_yt_leech or auto_leech or auto_mirror):
+        return False
+    message_text = message.text or message.caption or ""
+    has_url = any(
+        is_url(word) or is_magnet(word) or is_telegram_link(word)
+        for word in message_text.split()
+    )
+    has_media = bool(
+        message.document or 
+        message.photo or 
+        message.video or 
+        message.audio or 
+        message.voice or 
+        message.video_note or 
+        message.sticker or 
+        message.animation
+    )
+    if auto_yt_leech and not (auto_leech or auto_mirror):
+        if has_url:
+            video_domains = [
+                'youtube.', 'youtu.be', 'twitter.', 'x.com', 'instagram.',
+                'facebook.', 'vimeo.', 'dailymotion.', 'soundcloud.', 
+                'tiktok.', 'twitch.', 'reddit.com'
+            ]
+            for word in message_text.split():
+                if is_url(word) and any(domain in word.lower() for domain in video_domains):
+                    return True
+        return False
+    return has_url or has_media
+
+auto_process_filter = filters.create(auto_message_filter)

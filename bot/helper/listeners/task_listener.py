@@ -74,6 +74,31 @@ class TaskListener(TaskConfig):
         self.proceed_count = 0
         self.progress = True
 
+    def apply_filename_modifications(self, filename):
+        if not filename:
+            return filename
+        original_filename = filename
+        prefix = (
+            self.user_dict.get("FILENAME_PREFIX")
+            or self.user_dict.get("LEECH_PREFIX")
+            or getattr(Config, "FILENAME_PREFIX", "")
+            or getattr(Config, "LEECH_PREFIX", "")
+        )
+        suffix = (
+            self.user_dict.get("FILENAME_SUFFIX")
+            or self.user_dict.get("LEECH_SUFFIX")
+            or getattr(Config, "FILENAME_SUFFIX", "")
+            or getattr(Config, "LEECH_SUFFIX", "")
+        )
+        if prefix or suffix:
+            from os import path as ospath
+            name, ext = ospath.splitext(filename)
+            filename = f"{prefix}{name}{suffix}{ext}"
+            LOGGER.info(
+                f"Applied prefix/suffix: '{original_filename}' -> '{filename}'"
+            )
+        return filename
+
     async def remove_from_same_dir(self):
         async with task_dict_lock:
             if (
@@ -290,7 +315,39 @@ class TaskListener(TaskConfig):
             self.clear()
 
         self.subproc = None
-
+        if not self.is_leech and self.user_dict.get("AUTO_RENAME", False):
+            try:
+                LOGGER.info(
+                    f"Auto Rename enabled for mirror operation - processing files at: {up_path}"
+                )
+                from bot.helper.ext_utils.filename_utils import (
+                    apply_auto_rename_to_path,
+                )
+                original_up_path = up_path
+                up_path = await apply_auto_rename_to_path(up_path, self)
+                if original_up_path != up_path:
+                    from os import path as ospath
+                    self.name = ospath.basename(up_path)
+                    LOGGER.info(f"Updated task name after auto rename: {self.name}")
+                if self.is_cancelled:
+                    return
+                self.size = await get_path_size(up_path)
+                LOGGER.info(
+                    "Auto Rename process completed successfully for mirror operation"
+                )
+            except Exception as e:
+                LOGGER.warning(f"Auto Rename failed for mirror operation: {e}")
+        elif not self.is_leech:
+            LOGGER.info(
+                "Auto Rename disabled or not configured for mirror operation"
+            )
+        if not self.is_leech:
+            original_name = self.name
+            self.name = self.apply_filename_modifications(self.name)
+            if original_name != self.name:
+                LOGGER.info(
+                    f"Applied filename modifications: '{original_name}' -> '{self.name}'"
+                )
         add_to_queue, event = await check_running_tasks(self, "up")
         await start_from_queued()
         if add_to_queue:
