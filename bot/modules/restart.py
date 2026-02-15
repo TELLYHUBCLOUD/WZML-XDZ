@@ -6,6 +6,7 @@ from sys import executable
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath, remove
 from pytz import timezone
+from pyrogram.types import Message
 
 from bot.version import get_version
 
