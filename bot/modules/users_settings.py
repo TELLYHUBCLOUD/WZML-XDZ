@@ -335,7 +335,7 @@ async def get_user_settings(from_user, stype="main"):
         else:
             grid_layout = "N/A"
         buttons.data_button("TMDB Settings", f"userset {user_id} tmdb")
-        buttons.data_button("❰", f"userset {user_id} leech", "footer")
+        buttons.data_button("❰", f"userset {user_id} back", "footer")
         buttons.data_button("✘", f"userset {user_id} close", "footer")
 
         btns = buttons.build_menu(2)
@@ -661,24 +661,14 @@ If only Auto YT Leech is enabled, only video URLs are processed.</i>"""
 <b>Start Episode:</b> {start_episode}
 <b>Start Season:</b> {start_season}
 
-<b><u>Template Variables (IMDB Integrated):</u></b>
-• <code>{{season}}</code> - Season number
-• <code>{{episode}}</code> - Episode (padded: 01, 02)
-• <code>{{episode2}}</code> - Episode (unpadded: 1, 2)
-• <code>{{quality}}</code> - Video quality (720, 1080)
-• <code>{{audio}}</code> - Audio language or MultiAuD
-• <code>{{title}}</code> - IMDB title
-• <code>{{year}}</code> - Release year
-• <code>{{rating}}</code> - IMDB rating
-• <code>{{genre}}</code> - Genre(s)
+<b><u>Template Variables:</u></b>
+• <code>{{season}}</code>, <code>{{episode}}</code>, <code>{{quality}}</code>
+• <code>{{audio}}</code>, <code>{{title}}</code>, <code>{{year}}</code>
+• <code>{{rating}}</code>, <code>{{genre}}</code>
 
-<b>Examples:</b>
-<code>S{{season}}E{{episode}}Q{{quality}}</code>
-<code>{{title}} ({{year}}) S{{season}}E{{episode}} [{{quality}}p]</code>
-<code>{{title}}.{{year}}.S{{season}}E{{episode}}.{{quality}}p.{{audio}}</code>
+<b>Example:</b> <code>{{title}}.S{{season}}E{{episode}}.{{quality}}p</code>
 
-<i>Auto Rename works for both Leech and Mirror operations.
-Automatically fetches IMDB info and renames files using the template.</i>
+<i>Auto Rename works for Leech/Mirror with IMDB integration.</i>
 """
     elif stype == "advanced":
         buttons.data_button(
@@ -976,11 +966,12 @@ async def event_handler(client, query, pfunc, rfunc, photo=False, document=False
         elif time() - update_time > 8 and handler_dict[user_id]:
             update_time = time()
             msg = await client.get_messages(query.message.chat.id, query.message.id)
-            text = msg.text.split("\n")
-            text[-1] = (
-                f"╰ <b>Time Left :</b> <code>{round(60 - (time() - start_time), 2)} sec</code>"
-            )
-            await edit_message(msg, "\n".join(text), msg.reply_markup)
+            if msg.text:
+                text = msg.text.split("\n")
+                text[-1] = (
+                    f"╰ <b>Time Left :</b> <code>{round(60 - (time() - start_time), 2)} sec</code>"
+                )
+                await edit_message(msg, "\n".join(text), msg.reply_markup)
     client.remove_handler(*handler)
 
 @new_task
@@ -1043,7 +1034,7 @@ async def edit_user_settings(client, query):
         buttons = ButtonMaker()
         # Safely get the instruction text, defaulting if key is missing
         text_desc = user_settings_text.get(data[3], ("", "", "<i>No instructions available.</i>\n" "╰ <b>Time Left :</b> <code>60 sec</code>"))[2]
-        buttons.data_button("⬢", f"userset {user_id} menu {data[3]} stop")
+        buttons.data_button("⬢ Stop", f"userset {user_id} menu {data[3]} stop")
         buttons.data_button("❰", f"userset {user_id} menu {data[3]}", "footer")
         buttons.data_button("✘", f"userset {user_id} close", "footer")
         current_text = getattr(message.text, 'html', '') if message.text else ''
