@@ -890,6 +890,9 @@ async def get_menu(option, message, user_id):
             buttons.data_button(
                 "View Thumb", f"userset {user_id} view THUMBNAIL", "header"
             )
+            # Add Reset button if thumbnail file exists
+            if await aiopath.exists(file_dict.get("THUMBNAIL", "")):
+                buttons.data_button("Reset", f"userset {user_id} remove {option}")
         elif option in ["YT_DLP_OPTIONS", "FFMPEG_CMDS", "UPLOAD_PATHS"]:
             buttons.data_button(
                 "Add One", f"userset {user_id} addone {option}", "header"
@@ -1064,7 +1067,7 @@ async def edit_user_settings(client, query):
         elif data[2] == "rmone":
             text_desc = f"Remove one or more key from {data[3]}. Example: key 1/key2/key 3. Timeout: 60 sec"
             func = remove_one
-        buttons.data_button("⬢", f"userset {user_id} menu {data[3]} stop")
+        buttons.data_button("⬢ Stop", f"userset {user_id} menu {data[3]} stop")
         buttons.data_button("❰", f"userset {user_id} menu {data[3]}", "footer")
         buttons.data_button("✘", f"userset {user_id} close", "footer")
         current_text = getattr(message.text, 'html', '') if message.text else ''
