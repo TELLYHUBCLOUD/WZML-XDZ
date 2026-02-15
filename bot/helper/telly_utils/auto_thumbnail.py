@@ -29,14 +29,17 @@ class AutoThumbnailHelper:
                 return None
             metadata = cls._extract_metadata_from_filename(filename)
             if not metadata:
+                LOGGER.info(f"Auto thumb: No metadata extracted from: {filename}")
                 return None
             clean_title = cls._extract_clean_title(filename)
             if not clean_title or len(clean_title) < 3:
+                LOGGER.info(f"Auto thumb: Clean title too short or empty for: {filename} → '{clean_title}'")
                 return None
             year = metadata.get("year")
             season = metadata.get("season")
             episode = metadata.get("episode")
             is_tv_show = bool(season or episode or cls._detect_tv_patterns(filename))
+            LOGGER.info(f"Auto thumb: '{filename}' → title='{clean_title}', year={year}, tv={is_tv_show}")
             user_dict = user_dict or {}
             thumbnail_type = user_dict.get('THUMBNAIL_TYPE') or Config.THUMBNAIL_TYPE or 'poster'
             cache_key = cls._generate_cache_key(clean_title, year, is_tv_show, thumbnail_type=thumbnail_type)
@@ -47,6 +50,7 @@ class AutoThumbnailHelper:
                 clean_title, year, is_tv_show, filename, user_dict=user_dict
             )
             if not thumbnail_url:
+                LOGGER.info(f"Auto thumb: All search strategies failed for: '{clean_title}'")
                 return None
             thumbnail_path = await cls._download_thumbnail(thumbnail_url, cache_key)
             if thumbnail_path:
@@ -356,8 +360,11 @@ class AutoThumbnailHelper:
             imdb_enabled = Config.IMDB_ENABLED
         thumbnail_type = user_dict.get('THUMBNAIL_TYPE') or Config.THUMBNAIL_TYPE or 'poster'
 
+        LOGGER.info(f"Auto thumb search: title='{clean_title}', tmdb_key={'SET' if Config.TMDB_API_KEY else 'NOT SET'}, tmdb={tmdb_enabled}, imdb={imdb_enabled}, type={thumbnail_type}")
+
         if Config.TMDB_API_KEY and tmdb_enabled:
             for _variation_name, search_query, search_year in search_variations:
+                LOGGER.info(f"Auto thumb TMDB try: [{_variation_name}] '{search_query}' year={search_year} tv={is_tv_show}")
                 thumbnail_url = await cls._get_tmdb_thumbnail(
                     search_query, search_year, is_tv_show, thumbnail_type=thumbnail_type
                 )

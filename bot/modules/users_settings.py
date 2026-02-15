@@ -92,11 +92,11 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button("General Settings", f"userset {user_id} general", position="header")
         buttons.data_button("Mirror Settings", f"userset {user_id} mirror")
         buttons.data_button("Leech Settings", f"userset {user_id} leech")
-        buttons.data_button("Thumbnails Option", f"userset {user_id} thumb_options")
-        buttons.data_button("FF Media Settings", f"userset {user_id} ffset")
-        buttons.data_button("Misc Settings", f"userset {user_id} advanced", position="l_body")
+        buttons.data_button("Thumbnails Settings", f"userset {user_id} thumb_options")
+        buttons.data_button("FFmpeg Settings", f"userset {user_id} ffset")
+        buttons.data_button("Advance Settings", f"userset {user_id} advanced", position="l_body")
         buttons.data_button("Auto Leech/Mirror", f"userset {user_id} auto_process", position="l_body")
-        buttons.data_button("Auto Rename", f"userset {user_id} auto_rename", position="l_body")
+        buttons.data_button("Auto Caption/Rename", f"userset {user_id} auto_rename", position="l_body")
         if user_dict and any(
             key in user_dict
             for key in list(user_settings_text.keys())
