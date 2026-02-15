@@ -1028,7 +1028,7 @@ async def edit_user_settings(client, query):
             back_to = "general"
         elif data[3] == "USE_GRID_THUMBNAIL":  # NEW
             back_to = "thumb_options"
-        elif data[3] == "AUTO_PROCESS":
+        elif data[3] in ["AUTO_YT_LEECH", "AUTO_LEECH", "AUTO_MIRROR"]:
             back_to = "auto_process"
         elif data[3] == "AUTO_RENAME":
             back_to = "auto_rename"
@@ -1046,8 +1046,9 @@ async def edit_user_settings(client, query):
         buttons.data_button("⬢", f"userset {user_id} menu {data[3]} stop")
         buttons.data_button("❰", f"userset {user_id} menu {data[3]}", "footer")
         buttons.data_button("✘", f"userset {user_id} close", "footer")
+        current_text = getattr(message.text, 'html', '') if message.text else ''
         await edit_message(
-            message, message.text.html + "\n" + text_desc, buttons.build_menu(1)
+            message, current_text + "\n" + text_desc, buttons.build_menu(1)
         )
         rfunc = partial(get_menu, data[3], message, user_id)
         pfunc = partial(add_file, ftype=data[3], rfunc=rfunc)
@@ -1075,8 +1076,9 @@ async def edit_user_settings(client, query):
         buttons.data_button("⬢", f"userset {user_id} menu {data[3]} stop")
         buttons.data_button("❰", f"userset {user_id} menu {data[3]}", "footer")
         buttons.data_button("✘", f"userset {user_id} close", "footer")
+        current_text = getattr(message.text, 'html', '') if message.text else ''
         await edit_message(
-            message, message.text.html + "\n" + text_desc, buttons.build_menu(1)
+            message, current_text + "\n" + text_desc, buttons.build_menu(1)
         )
         rfunc = partial(get_menu, data[3], message, user_id)
         pfunc = partial(func, option=data[3], rfunc=rfunc)
