@@ -30,22 +30,7 @@ class DefaultDict(dict):
 
 
 async def generate_caption(filename, directory, caption_template, media_info=None):
-    """
-    Generates a caption for a media file based on its MediaInfo
-    and a provided template.
-
-    Args:
-        filename: The name of the media file.
-        directory: The directory where the file is located.
-        caption_template: A string template for the caption with placeholders.
-        media_info: Optional dict with pre-extracted media information from telegram_uploader.
-
-    Returns:
-        A formatted caption string or the original filename if MediaInfo fails.
-    """
     file_path = os.path.join(directory, filename)
-
-    # Use pre-extracted media info if provided
     if media_info:
         caption_data = DefaultDict(
             filename=media_info.get("filename", filename),
@@ -134,15 +119,6 @@ async def generate_caption(filename, directory, caption_template, media_info=Non
 
 
 def get_video_quality(height):
-    """
-    Determines video quality string (e.g., 720p, 1080p) based on video height.
-
-    Args:
-        height: The height of the video in pixels.
-
-    Returns:
-        A string representing the video quality, or "Unknown".
-    """
     if height:
         quality_map = {
             480: "480p",
@@ -160,17 +136,6 @@ def get_video_quality(height):
 
 
 def parse_audio_language(existing_languages, audio_stream):
-    """
-    Parses the language from an audio stream and appends its display name
-    to the existing languages string if not already present.
-
-    Args:
-        existing_languages: A string of already parsed audio languages.
-        audio_stream: A dictionary representing an audio stream from MediaInfo.
-
-    Returns:
-        An updated string of audio languages.
-    """
     language_code = audio_stream.get("Language")
     if language_code:
         with suppress(Exception):
@@ -182,17 +147,6 @@ def parse_audio_language(existing_languages, audio_stream):
 
 
 def parse_subtitle_language(existing_subtitles, subtitle_stream):
-    """
-    Parses the language from a subtitle stream and appends its display name
-    to the existing subtitles string if not already present.
-
-    Args:
-        existing_subtitles: A string of already parsed subtitle languages.
-        subtitle_stream: A dictionary representing a subtitle stream from MediaInfo.
-
-    Returns:
-        An updated string of subtitle languages.
-    """
     subtitle_code = subtitle_stream.get("Language")
     if subtitle_code:
         with suppress(Exception):
@@ -202,17 +156,7 @@ def parse_subtitle_language(existing_subtitles, subtitle_stream):
                 existing_subtitles += f"{subtitle_name}, "
     return existing_subtitles.strip(", ")
 
-
 def calculate_md5(file_path):
-    """
-    Calculates the MD5 hash of the given file.
-
-    Args:
-        file_path: The path to the file.
-
-    Returns:
-        A hexadecimal string representing the MD5 hash.
-    """
     md5_hash = md5()
     with open(file_path, "rb") as file:
         for chunk in iter(lambda: file.read(4096), b""):

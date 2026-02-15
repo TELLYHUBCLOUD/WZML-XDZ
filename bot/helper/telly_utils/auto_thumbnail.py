@@ -139,12 +139,12 @@ class AutoThumbnailHelper:
                 is_tv_show = True
                 break
         technical_patterns = [
-            r"\s+(720p|1080p|2160p|4k|hd|fhd|uhd|8k)\b.*$",
+            r"\s+(240p|360p|480p|720p|1080p|2160p|4k|hd|fhd|uhd|8k)\b.*$",
             r"\s+(x264|x265|h264|h265|hevc|avc|xvid)\b.*$",
-            r"\s+(bluray|webrip|web-dl|hdtv|brrip|hdrip|dvdrip)\b.*$",
-            r"\s+(aac|ac3|dts|mp3|flac|opus)\b.*$",
-            r"\s+(hindi|tamil|telugu|english|dual|multi|dubbed)\b.*$",
-            r"\s+(hq|lq|cam|ts|tc|r5|dvdscr)\b.*$",
+            r"\s+(bluray|webrip|web\s*dl|webdl|hdtv|brrip|hdrip|dvdrip|pdtv)\b.*$",
+            r"\s+(aac|ac3|dts|mp3|flac|opus|dd5\.?1|atmos)\b.*$",
+            r"\s+(hindi|tamil|telugu|bengali|kannada|malayalam|marathi|punjabi|gujarati|english|korean|japanese|dual|multi|dubbed|audio)\b.*$",
+            r"\s+(hq|lq|cam|ts|tc|r5|dvdscr|iscreen|predvd|hdrip)\b.*$",
             r"\s+\d+mb\b.*$",
             r"\s+(esub|subs|subtitle)\b.*$",
         ]
@@ -195,13 +195,13 @@ class AutoThumbnailHelper:
                 is_tv_show = True
                 break
         technical_patterns = [
-            r"\b(720p|1080p|2160p|4k|uhd|fhd|hd|sd)\b",
-            r"\b(bluray|bdrip|brrip|dvdrip|webrip|web-dl|hdtv|pdtv|cam|ts|tc)\b",
+            r"\b(240p|360p|480p|720p|1080p|2160p|4k|uhd|fhd|hd|sd)\b",
+            r"\b(bluray|bdrip|brrip|dvdrip|webrip|web\s*dl|webdl|hdtv|pdtv|cam|ts|tc|iscreen|predvd|hdrip)\b",
             r"\b(x264|x265|h264|h265|hevc|avc|xvid|divx)\b",
-            r"\b(aac|ac3|dts|mp3|flac|opus|dd5\.1|atmos)\b",
+            r"\b(aac|ac3|dts|mp3|flac|opus|dd5\.?1|atmos)\b",
             r"\b(proper|repack|internal|limited|extended|unrated|directors?\.cut)\b",
             r"\b(amzn|nf|hulu|dsnp|hbo|max|atvp|cr|funimation)\b",
-            r"\b(hindi|tamil|telugu|malayalam|english|dubbed|dual|audio|multi)\b",
+            r"\b(hindi|tamil|telugu|bengali|kannada|malayalam|marathi|punjabi|gujarati|english|korean|japanese|dubbed|dual|audio|multi)\b",
             r"\b(esub|sub|subtitle|subs)\b",
             r"\[.*?\]",
             r"\{.*?\}",
