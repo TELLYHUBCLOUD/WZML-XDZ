@@ -120,6 +120,7 @@ class AutoThumbnailHelper:
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
         title = re.sub(r"@", "", title)
         title = re.sub(r"@[\w\-\.]+", "", title)
+        title = re.sub(r"\[.*?\]", "", title)
         title = re.sub(r"[._-]+", " ", title)
         year_match = re.search(r"\b(19|20)\d{2}\b", title)
         year = year_match.group(0) if year_match else None
@@ -224,6 +225,7 @@ class AutoThumbnailHelper:
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
         title = re.sub(r"@[\w\-\.]+", "", title)
+        title = re.sub(r"\[.*?\]", "", title)
 
         # Replace separators
         title = re.sub(r"[._-]+", " ", title)
@@ -255,6 +257,7 @@ class AutoThumbnailHelper:
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
         title = re.sub(r"@[\w\-\.]+", "", title)
+        title = re.sub(r"\[.*?\]", "", title)
         title = re.sub(r"[._-]+", " ", title)
         words = title.split()
         stop_indicators = [
@@ -326,6 +329,7 @@ class AutoThumbnailHelper:
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
         title = re.sub(r"@[\w\-\.]+", "", title)
+        title = re.sub(r"\[.*?\]", "", title)
         title = re.sub(r"[._-]+", " ", title)
         words = title.split()[:4]
         return " ".join(words).strip()
