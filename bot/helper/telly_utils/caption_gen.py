@@ -47,6 +47,8 @@ async def generate_caption(filename, directory, caption_template, media_info=Non
             season=media_info.get("season", ""),
             episode=media_info.get("episode", ""),
             audio=media_info.get("audio", "Unknown"),
+            rating=media_info.get("rating", ""),
+            genre=media_info.get("genre", ""),
             # Legacy fields for backward compatibility
             size=media_info.get("filesize", "Unknown"),
             audios=media_info.get("languages", "Unknown"),

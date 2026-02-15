@@ -314,10 +314,37 @@ class TelegramUploader:
                 LOGGER.error(f"Auto rename failed for leech: {e}")
                 file_ = pre_file_  # Keep original name if auto rename fails
         
+        # Build media_info dict for caption generation when auto rename was applied
+        media_info = None
+        if auto_rename and file_ != pre_file_:
+            try:
+                media_info = {
+                    "filename": file_,
+                    "filesize": "",
+                    "file_caption": "",
+                    "languages": template_fields.get("audio", ""),
+                    "subtitles": "",
+                    "duration": "",
+                    "ott": "",
+                    "resolution": f"{template_fields.get('quality', '')}p" if template_fields.get('quality') else "",
+                    "name": template_fields.get("title", ""),
+                    "year": str(template_fields.get("year", "")),
+                    "quality": f"{template_fields.get('quality', '')}p" if template_fields.get('quality') else "",
+                    "season": str(template_fields.get("season", "")),
+                    "episode": str(template_fields.get("episode", "")),
+                    "audio": template_fields.get("audio", ""),
+                    "rating": template_fields.get("rating", ""),
+                    "genre": template_fields.get("genre", ""),
+                    "md5_hash": "",
+                }
+            except Exception as e:
+                LOGGER.error(f"Failed to build media_info for caption: {e}")
+                media_info = None
+
         # Continue with existing logic using file_ (which may be renamed)
         if self._lcaption:
             # Pass media_info to generate_caption if available
-            cap_mono = await generate_caption(file_, dirpath, self._lcaption, media_info=media_info if auto_rename else None)
+            cap_mono = await generate_caption(file_, dirpath, self._lcaption, media_info=media_info)
         if self._lprefix:
             if not self._lcaption:
                 cap_mono = f"{self._lprefix} {file_}"
@@ -848,7 +875,7 @@ def extract_media_info(filename):
     # Clean up the remaining name
     # Remove quality indicators
     name_only = re.sub(
-        r"\b(480p|720p|1080p|2160p|4k|8k)\b", "", name_only, flags=re.IGNORECASE
+        r"\b(240p|360p|480p|720p|1080p|2160p|4k|8k)\b", "", name_only, flags=re.IGNORECASE
     )
     # Remove codec/format indicators
     name_only = re.sub(
@@ -861,7 +888,21 @@ def extract_media_info(filename):
     name_only = re.sub(r"\[.*?\]", "", name_only)
     # Remove source indicators
     name_only = re.sub(
-        r"\b(BluRay|BRRip|WEB-DL|WEBRip|HDTV|DVDRip|BDRip|WEB)\b",
+        r"\b(BluRay|BRRip|WEB[-\s]?DL|WEBRip|HDTV|DVDRip|BDRip|WEB|PDTV|IScreen|PreDVD|HDRip|CAM|TS|TC)\b",
+        "",
+        name_only,
+        flags=re.IGNORECASE,
+    )
+    # Remove language indicators
+    name_only = re.sub(
+        r"\b(Hindi|Tamil|Telugu|Bengali|Kannada|Malayalam|Marathi|Punjabi|Gujarati|English|Korean|Japanese|Dual|Multi|Dubbed|Audio|ESub|Subs?|Subtitle)\b",
+        "",
+        name_only,
+        flags=re.IGNORECASE,
+    )
+    # Remove audio format indicators
+    name_only = re.sub(
+        r"\b(AAC|AC3|DTS|MP3|FLAC|OPUS|DD5\.?1|Atmos|MultiAuD)\b",
         "",
         name_only,
         flags=re.IGNORECASE,
