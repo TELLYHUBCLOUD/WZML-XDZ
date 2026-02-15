@@ -22,6 +22,7 @@ class Config:
     IMDB_ENABLED = True
     TMDB_LANGUAGE = "en-US"
     TMDB_ADULT_CONTENT = False
+    THUMBNAIL_TYPE = "poster"
     RENAME_TEMPLATE = "S{season}E{episode}Q{quality}"
     START_EPISODE = 1
     START_SEASON = 1

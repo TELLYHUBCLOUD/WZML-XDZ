@@ -1,166 +1,98 @@
-"""
-Auto Thumbnail Helper Module
-Automatically fetches movie/TV show thumbnails from IMDB and TMDB based on filename metadata
-"""
-
 import contextlib
 import os
 import re
-
-# TMDB functionality moved here from stream_utils
 from datetime import datetime, timedelta
 from os import path as ospath
 from time import time
 from typing import ClassVar
-
 import aiohttp
 from aiofiles import open as aioopen
-
 from bot import LOGGER
 from bot.core.config_manager import Config
-
-# Use compatibility layer for aiofiles
-# Use compatibility layer for aiofiles
 from asyncio import to_thread
 from os import makedirs
 from aiofiles.os import path as aiopath, remove
-
+from bot.helper.ext_utils.bot_utils import sync_to_async
 
 class AutoThumbnailHelper:
-    """Helper class for automatically fetching thumbnails from IMDB/TMDB"""
-
     THUMBNAIL_DIR = "thumbnails/auto"
     CACHE_DURATION = 86400  # 24 hours
     MAX_CACHE_SIZE = 100  # Maximum number of cached thumbnails
 
     @classmethod
     async def get_auto_thumbnail(
-        cls, filename: str, user_id: int | None = None, enabled: bool | None = None
+        cls, filename: str, user_id: int | None = None, enabled: bool | None = None, user_dict: dict | None = None
     ) -> str | None:
-        """
-        Get auto thumbnail for a file based on its metadata
-
-        Args:
-            filename: The filename to extract metadata from
-            user_id: User ID for cache organization (optional)
-            enabled: Override for auto thumbnail enabled status (optional)
-
-        Returns:
-            Path to downloaded thumbnail or None if not found
-        """
         try:
-            # Use provided enabled parameter, otherwise fall back to config
             auto_enabled = enabled if enabled is not None else Config.AUTO_THUMBNAIL
-
             if not auto_enabled:
                 return None
-
-            # Extract metadata from filename
-            # Extract metadata from filename
             metadata = cls._extract_metadata_from_filename(filename)
             if not metadata:
                 return None
-
-            # Clean title for search
             clean_title = cls._extract_clean_title(filename)
             if not clean_title or len(clean_title) < 3:
                 return None
-
             year = metadata.get("year")
             season = metadata.get("season")
             episode = metadata.get("episode")
-
-            # Determine if it's a TV show or movie
             is_tv_show = bool(season or episode or cls._detect_tv_patterns(filename))
-
-            # Try to get thumbnail from cache first
-            cache_key = cls._generate_cache_key(clean_title, year, is_tv_show)
+            user_dict = user_dict or {}
+            thumbnail_type = user_dict.get('THUMBNAIL_TYPE') or Config.THUMBNAIL_TYPE or 'poster'
+            cache_key = cls._generate_cache_key(clean_title, year, is_tv_show, thumbnail_type=thumbnail_type)
             cached_thumbnail = await cls._get_cached_thumbnail(cache_key)
             if cached_thumbnail:
                 return cached_thumbnail
-
-            # Use advanced search strategy with multiple approaches
             thumbnail_url = await cls._advanced_search_strategy(
-                clean_title, year, is_tv_show, filename
+                clean_title, year, is_tv_show, filename, user_dict=user_dict
             )
-
             if not thumbnail_url:
                 return None
-
-            # Download and cache the thumbnail
             thumbnail_path = await cls._download_thumbnail(thumbnail_url, cache_key)
             if thumbnail_path:
                 return thumbnail_path
-
             return None
-
         except Exception as e:
             LOGGER.error(f"Error getting auto thumbnail for {filename}: {e}")
             return None
-
     @classmethod
     def _extract_metadata_from_filename(cls, filename: str) -> dict:
-        """
-        Extract basic metadata from filename using regex
-        Replaces the missing template_processor.extract_metadata_from_filename
-        """
         if not filename:
             return {}
-
         metadata = {}
-        
-        # Extract title (simple cleanup)
         clean_title = cls._extract_clean_title(filename)
         if clean_title:
             metadata["title"] = clean_title
-
-        # Extract year
         year_match = re.search(r"\b(19|20)\d{2}\b", filename)
         if year_match:
             metadata["year"] = int(year_match.group(0))
-
-        # Extract season and episode
         season_match = re.search(r"\bS(\d{1,2})\b", filename, re.IGNORECASE)
         if season_match:
             metadata["season"] = int(season_match.group(1))
-            
         episode_match = re.search(r"\bE(\d{1,3})\b", filename, re.IGNORECASE)
         if episode_match:
             metadata["episode"] = int(episode_match.group(1))
-            
-        # Fallback for season/episode
         if not metadata.get("season") and not metadata.get("episode"):
-             # Try 1x01 format
              x_match = re.search(r"\b(\d{1,2})x(\d{1,3})\b", filename, re.IGNORECASE)
              if x_match:
                  metadata["season"] = int(x_match.group(1))
                  metadata["episode"] = int(x_match.group(2))
-
         return metadata
 
     @classmethod
     def _extract_clean_title(cls, filename: str) -> str:
-        """Enhanced title extraction with multiple strategies"""
         if not filename:
             return ""
-
-        # Store original for fallback
         original_filename = filename
-
-        # Remove file extension
         title = filename.rsplit(".", 1)[0] if "." in filename else filename
-
-        # Try multiple extraction strategies and return the best one
         strategies = [
-            cls._extract_title_strategy_1,  # Conservative cleaning
-            cls._extract_title_strategy_2,  # Aggressive cleaning
-            cls._extract_title_strategy_3,  # Anime-specific
-            cls._extract_title_strategy_4,  # Fallback word-by-word
+            cls._extract_title_strategy_1,
+            cls._extract_title_strategy_2,
+            cls._extract_title_strategy_3,
+            cls._extract_title_strategy_4,
         ]
-
         best_title = ""
         best_score = 0
-
         for strategy in strategies:
             try:
                 extracted_title = strategy(title, original_filename)
@@ -169,48 +101,33 @@ class AutoThumbnailHelper:
                 if score > best_score and len(extracted_title.strip()) >= 2:
                     best_title = extracted_title
                     best_score = score
-
             except Exception:
                 continue
-
         return (
             best_title.strip()
             if best_title
             else cls._extract_title_fallback(original_filename)
         )
-
     @classmethod
     def _extract_title_strategy_1(cls, title: str, _original: str) -> str:
-        """Enhanced conservative cleaning with better title preservation"""
-        # Remove website prefixes first
         title = re.sub(
             r"^www\.\w+\.(com|net|org|in|onl|co|tv|me|to|cc|xyz)\s*-\s*",
             "",
             title,
             flags=re.IGNORECASE,
         )
-
-        # Remove common Telegram bot prefixes/suffixes (like @hello, @botname, etc.)
-        # Remove prefix patterns like "@word " at the beginning (more flexible)
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
-        # Remove suffix patterns like " @word" at the end (more flexible)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
-        # Remove multiple @ patterns in case there are several
+        title = re.sub(r"@", "", title)
         title = re.sub(r"@[\w\-\.]+", "", title)
-
-        # Replace separators with spaces
         title = re.sub(r"[._-]+", " ", title)
-
-        # Extract year first (more robust pattern)
         year_match = re.search(r"\b(19|20)\d{2}\b", title)
         year = year_match.group(0) if year_match else None
-
-        # Detect TV show patterns
         tv_patterns = [
-            r"\bS\d{1,2}E\d{1,3}\b",  # S01E01
-            r"\bSeason\s*\d+\b",  # Season 1
-            r"\bEpisode\s*\d+\b",  # Episode 1
-            r"\b\d{1,2}x\d{1,3}\b",  # 1x01
+            r"\bS\d{1,2}E\d{1,3}\b",
+            r"\bSeason\s*\d+\b",
+            r"\bEpisode\s*\d+\b",
+            r"\b\d{1,2}x\d{1,3}\b",
         ]
 
         is_tv_show = False
@@ -220,8 +137,6 @@ class AutoThumbnailHelper:
                 title = title[: match.start()].strip()
                 is_tv_show = True
                 break
-
-        # Enhanced removal of technical terms and quality indicators
         technical_patterns = [
             r"\s+(720p|1080p|2160p|4k|hd|fhd|uhd|8k)\b.*$",
             r"\s+(x264|x265|h264|h265|hevc|avc|xvid)\b.*$",
@@ -235,8 +150,6 @@ class AutoThumbnailHelper:
 
         for pattern in technical_patterns:
             title = re.sub(pattern, "", title, flags=re.IGNORECASE)
-
-        # Remove bracketed/parenthetical content that looks technical
         title = re.sub(
             r"\s*\[[^\]]*(?:rip|encode|web|hd|quality|group|tam|tel|hin|aac|mb|esub)\s*[^\]]*\]",
             "",
@@ -249,41 +162,24 @@ class AutoThumbnailHelper:
             title,
             flags=re.IGNORECASE,
         )
-
-        # Clean up spacing and multiple spaces
         title = re.sub(r"\s+", " ", title).strip()
-
-        # Preserve year in parentheses for movies if it exists
         if year and not is_tv_show:
-            # Remove standalone year and add it in parentheses if not already there
             if f"({year})" not in title and f" {year}" in title:
                 title = re.sub(rf"\s+{re.escape(year)}\s*", " ", title).strip()
                 title = f"{title} ({year})"
             elif f"({year})" not in title and f"{year}" in title:
                 title = re.sub(rf"\b{re.escape(year)}\b", "", title).strip()
                 title = f"{title} ({year})"
-
         return title
 
     @classmethod
     def _extract_title_strategy_2(cls, title: str, _original: str) -> str:
-        """Aggressive cleaning - remove all technical indicators"""
-        # Remove common Telegram bot prefixes/suffixes (like @hello, @botname, etc.)
-        # Remove prefix patterns like "@word " at the beginning (more flexible)
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
-        # Remove suffix patterns like " @word" at the end (more flexible)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
-        # Remove multiple @ patterns in case there are several
         title = re.sub(r"@[\w\-\.]+", "", title)
-
-        # Replace separators
         title = re.sub(r"[._-]+", " ", title)
-
-        # Extract year
         year_match = re.search(r"\b(19|20)\d{2}\b", title)
         year = year_match.group(0) if year_match else None
-
-        # Remove TV show indicators
         tv_patterns = [
             r"\bS\d{1,2}E\d{1,3}.*$",
             r"\bSeason\s*\d+.*$",
@@ -297,8 +193,6 @@ class AutoThumbnailHelper:
                 title = re.sub(pattern, "", title, flags=re.IGNORECASE)
                 is_tv_show = True
                 break
-
-        # Comprehensive technical term removal
         technical_patterns = [
             r"\b(720p|1080p|2160p|4k|uhd|fhd|hd|sd)\b",
             r"\b(bluray|bdrip|brrip|dvdrip|webrip|web-dl|hdtv|pdtv|cam|ts|tc)\b",
@@ -308,46 +202,35 @@ class AutoThumbnailHelper:
             r"\b(amzn|nf|hulu|dsnp|hbo|max|atvp|cr|funimation)\b",
             r"\b(hindi|tamil|telugu|malayalam|english|dubbed|dual|audio|multi)\b",
             r"\b(esub|sub|subtitle|subs)\b",
-            r"\[.*?\]",  # All bracketed content
-            r"\{.*?\}",  # All braced content
-            r"\((?!19|20)\d{2}.*?\)",  # Parentheses except years
+            r"\[.*?\]",
+            r"\{.*?\}",
+            r"\((?!19|20)\d{2}.*?\)",
         ]
-
         for pattern in technical_patterns:
             title = re.sub(pattern, "", title, flags=re.IGNORECASE)
-
-        # Remove release group patterns
         title = re.sub(r"-\w+$", "", title)
         title = re.sub(r"^\w+-", "", title)
-
-        # Clean up
         title = re.sub(r"\s+", " ", title).strip()
-
-        # Add year back for movies
         if year and not is_tv_show and f"({year})" not in title:
             title = re.sub(rf"\b{re.escape(year)}\b", "", title).strip()
             title = f"{title} ({year})"
-
         return title
 
     @classmethod
     def _extract_title_strategy_3(cls, title: str, _original: str) -> str:
         """Anime-specific extraction"""
-        # Remove common Telegram bot prefixes/suffixes (like @hello, @botname, etc.)
-        # Remove prefix patterns like "@word " at the beginning (more flexible)
+        title = re.sub(r"^@\w+\s+", "", title)
+        title = re.sub(r"\s+@\w+$", "", title)
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
-        # Remove suffix patterns like " @word" at the end (more flexible)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
-        # Remove multiple @ patterns in case there are several
         title = re.sub(r"@[\w\-\.]+", "", title)
 
         # Replace separators
         title = re.sub(r"[._-]+", " ", title)
 
-        # Anime-specific patterns
         anime_patterns = [
             r"\s+(ep|episode|ova|ona|special|movie)\s*\d+.*$",
-            r"\s+\d{2,3}.*$",  # Episode numbers like "01", "001"
+            r"\s+\d{2,3}.*$",
             r"\s+(bd|dvd|tv|web).*$",
             r"\s+(uncensored|censored).*$",
             r"\s+(batch|complete|season).*$",
@@ -355,39 +238,25 @@ class AutoThumbnailHelper:
 
         for pattern in anime_patterns:
             title = re.sub(pattern, "", title, flags=re.IGNORECASE)
-
-        # Remove technical terms but preserve anime-specific terms
         title = re.sub(
             r"\s+(720p|1080p|x264|x265|aac|flac).*$", "", title, flags=re.IGNORECASE
         )
-
-        # Remove bracketed content except if it might be part of title
         title = re.sub(
             r"\s*\[[^\]]*(?:rip|encode|web|bd|dvd)\s*[^\]]*\]",
             "",
             title,
             flags=re.IGNORECASE,
         )
-
-        # Clean up
         return re.sub(r"\s+", " ", title).strip()
 
     @classmethod
     def _extract_title_strategy_4(cls, title: str, _original: str) -> str:
         """Word-by-word fallback strategy"""
-        # Remove common Telegram bot prefixes/suffixes (like @hello, @botname, etc.)
-        # Remove prefix patterns like "@word " at the beginning (more flexible)
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
-        # Remove suffix patterns like " @word" at the end (more flexible)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
-        # Remove multiple @ patterns in case there are several
         title = re.sub(r"@[\w\-\.]+", "", title)
-
-        # Replace separators
         title = re.sub(r"[._-]+", " ", title)
         words = title.split()
-
-        # Technical indicators that signal end of title
         stop_indicators = [
             r"^(s\d+e\d+|season|episode|\d{1,2}x\d+)$",
             r"^(720p|1080p|2160p|4k|hd|uhd)$",
@@ -398,21 +267,15 @@ class AutoThumbnailHelper:
 
         title_words = []
         for word in words:
-            # Stop at technical indicators
             if any(
                 re.match(pattern, word, re.IGNORECASE) for pattern in stop_indicators
             ):
                 break
-
-            # Skip obvious technical terms
-            if re.match(r"^\d{4}$", word):  # Standalone year
+            if re.match(r"^\d{4}$", word):
                 continue
             if len(word) <= 2 and word.upper() in ["CR", "BD", "TV", "WEB"]:
                 continue
-
             title_words.append(word)
-
-            # Reasonable title length limit
             if len(title_words) >= 6:
                 break
 
@@ -423,10 +286,7 @@ class AutoThumbnailHelper:
         """Score the quality of extracted title"""
         if not title or len(title.strip()) < 2:
             return 0
-
         score = 0
-
-        # Length scoring (prefer reasonable lengths)
         length = len(title.strip())
         if 10 <= length <= 50:
             score += 10
@@ -434,8 +294,6 @@ class AutoThumbnailHelper:
             score += 5
         elif length < 5:
             score -= 5
-
-        # Word count scoring
         word_count = len(title.split())
         if 2 <= word_count <= 6:
             score += 8
@@ -443,8 +301,6 @@ class AutoThumbnailHelper:
             score += 3
         elif word_count > 8:
             score -= 3
-
-        # Penalize if contains technical terms
         technical_terms = [
             "720p",
             "1080p",
@@ -456,12 +312,8 @@ class AutoThumbnailHelper:
         ]
         if any(term in title.lower() for term in technical_terms):
             score -= 10
-
-        # Bonus for having year in proper format
         if re.search(r"\(\d{4}\)", title):
             score += 5
-
-        # Bonus for proper capitalization
         if title.istitle() or any(word[0].isupper() for word in title.split()):
             score += 3
 
@@ -470,19 +322,12 @@ class AutoThumbnailHelper:
     @classmethod
     def _extract_title_fallback(cls, filename: str) -> str:
         """Last resort title extraction"""
-        # Just take the first few words before any obvious technical terms
         title = filename.rsplit(".", 1)[0] if "." in filename else filename
-
-        # Remove common Telegram bot prefixes/suffixes (like @hello, @botname, etc.)
-        # Remove prefix patterns like "@word " at the beginning (more flexible)
         title = re.sub(r"^@[\w\-\.]+\s+", "", title)
-        # Remove suffix patterns like " @word" at the end (more flexible)
         title = re.sub(r"\s+@[\w\-\.]+$", "", title)
-        # Remove multiple @ patterns in case there are several
         title = re.sub(r"@[\w\-\.]+", "", title)
-
         title = re.sub(r"[._-]+", " ", title)
-        words = title.split()[:4]  # Take first 4 words max
+        words = title.split()[:4]
         return " ".join(words).strip()
 
     @classmethod
@@ -492,86 +337,74 @@ class AutoThumbnailHelper:
         year: int | None,
         is_tv_show: bool,
         original_filename: str,
+        user_dict: dict | None = None,
     ) -> str | None:
         """Advanced search strategy with multiple approaches and fallbacks"""
-
-        # Generate multiple search variations
+        user_dict = user_dict or {}
         search_variations = cls._generate_search_variations(
             clean_title, year, is_tv_show, original_filename
         )
+        tmdb_enabled = user_dict.get('TMDB_ENABLED')
+        if tmdb_enabled is None:
+            tmdb_enabled = Config.TMDB_ENABLED
+        imdb_enabled = user_dict.get('IMDB_ENABLED')
+        if imdb_enabled is None:
+            imdb_enabled = Config.IMDB_ENABLED
+        thumbnail_type = user_dict.get('THUMBNAIL_TYPE') or Config.THUMBNAIL_TYPE or 'poster'
 
-        # Try TMDB first (better quality images)
-        if Config.TMDB_API_KEY and Config.TMDB_ENABLED:
+        if Config.TMDB_API_KEY and tmdb_enabled:
             for _variation_name, search_query, search_year in search_variations:
                 thumbnail_url = await cls._get_tmdb_thumbnail(
-                    search_query, search_year, is_tv_show
+                    search_query, search_year, is_tv_show, thumbnail_type=thumbnail_type
                 )
 
                 if thumbnail_url:
                     return thumbnail_url
-
-                # For movies, also try as TV show (anime often categorized as TV)
                 if not is_tv_show:
                     thumbnail_url = await cls._get_tmdb_thumbnail(
-                        search_query, search_year, True
+                        search_query, search_year, True, thumbnail_type=thumbnail_type
                     )
                     if thumbnail_url:
                         return thumbnail_url
-
-        # Fallback to IMDB with same variations
-        if Config.IMDB_ENABLED:
+        if imdb_enabled:
             for _variation_name, search_query, search_year in search_variations:
-                # Format query for IMDB
                 imdb_query = (
                     f"{search_query} {search_year}" if search_year else search_query
                 )
                 thumbnail_url = await cls._get_imdb_thumbnail(
                     imdb_query, search_year
                 )
-
                 if thumbnail_url:
                     return thumbnail_url
-
-        # Last resort: Word-by-word and partial search
         thumbnail_url = await cls._desperate_search_strategy(
-            clean_title, year, is_tv_show
+            clean_title, year, is_tv_show, tmdb_enabled=tmdb_enabled, imdb_enabled=imdb_enabled, thumbnail_type=thumbnail_type
         )
         if thumbnail_url:
             return thumbnail_url
-
         return None
-
     @classmethod
     async def _desperate_search_strategy(
-        cls, clean_title: str, year: int | None, is_tv_show: bool
+        cls, clean_title: str, year: int | None, is_tv_show: bool,
+        tmdb_enabled: bool = True, imdb_enabled: bool = True,
+        thumbnail_type: str = "poster",
     ) -> str | None:
         """Last resort: try every word and partial combinations"""
-
-        # Generate all possible search terms
         search_terms = cls._generate_desperate_search_terms(clean_title)
-
-        # Try TMDB first with each term
-        if Config.TMDB_API_KEY and Config.TMDB_ENABLED:
+        if Config.TMDB_API_KEY and tmdb_enabled:
             for term in search_terms:
-                if len(term.strip()) < 3:  # Skip very short terms
+                if len(term.strip()) < 3:
                     continue
-
-                # Try as both movie and TV show
                 for is_tv in [is_tv_show, not is_tv_show]:
-                    thumbnail_url = await cls._get_tmdb_thumbnail(term, year, is_tv)
+                    thumbnail_url = await cls._get_tmdb_thumbnail(term, year, is_tv, thumbnail_type=thumbnail_type)
                     if thumbnail_url:
                         return thumbnail_url
-
-        # Try IMDB with each term
-        if Config.IMDB_ENABLED:
+        if imdb_enabled:
             for term in search_terms:
-                if len(term.strip()) < 3:  # Skip very short terms
+                if len(term.strip()) < 3:
                     continue
-
                 thumbnail_url = await cls._get_imdb_thumbnail(term, year)
                 if thumbnail_url:
                     return thumbnail_url
-
         return None
 
     @classmethod
@@ -579,8 +412,6 @@ class AutoThumbnailHelper:
         """Generate all possible search terms from title"""
         terms = []
         words = title.split()
-
-        # Remove common stop words that don't help with search
         stop_words = {
             "the",
             "a",
@@ -1041,7 +872,8 @@ class AutoThumbnailHelper:
 
     @classmethod
     async def _get_tmdb_thumbnail(
-        cls, title: str, year: int | None = None, is_tv_show: bool = False
+        cls, title: str, year: int | None = None, is_tv_show: bool = False,
+        thumbnail_type: str = "poster",
     ) -> str | None:
         """Enhanced TMDB thumbnail search with better result selection"""
         try:
@@ -1057,8 +889,11 @@ class AutoThumbnailHelper:
             else:
                 result = await TMDBHelper.search_movie_enhanced(title, year)
 
-            if result and result.get("poster_path"):
-                return TMDBHelper.get_poster_url(result["poster_path"], "w500")
+            if result:
+                if thumbnail_type == "backdrop" and result.get("backdrop_path"):
+                    return TMDBHelper.get_backdrop_url(result["backdrop_path"], "w1280")
+                if result.get("poster_path"):
+                    return TMDBHelper.get_poster_url(result["poster_path"], "w500")
 
             return None
 
@@ -1082,7 +917,7 @@ class AutoThumbnailHelper:
             search_query = (
                 f"{clean_search_title} {year}" if year else clean_search_title
             )
-            imdb_data = await get_poster(search_query, False, False)
+            imdb_data = await sync_to_async(get_poster, search_query, False, False)
 
             if imdb_data and imdb_data.get("poster"):
                 return imdb_data["poster"]
@@ -1095,7 +930,8 @@ class AutoThumbnailHelper:
 
     @classmethod
     def _generate_cache_key(
-        cls, title: str, year: int | None = None, is_tv_show: bool = False
+        cls, title: str, year: int | None = None, is_tv_show: bool = False,
+        thumbnail_type: str = "poster",
     ) -> str:
         """Generate cache key for thumbnail"""
         key_parts = [title.lower().replace(" ", "_")]
@@ -1105,6 +941,8 @@ class AutoThumbnailHelper:
             key_parts.append("tv")
         else:
             key_parts.append("movie")
+        if thumbnail_type and thumbnail_type != "poster":
+            key_parts.append(thumbnail_type)
 
         return "_".join(key_parts)
 

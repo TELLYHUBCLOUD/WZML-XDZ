@@ -51,6 +51,7 @@ tmdb_options = [
     "IMDB_ENABLED",
     "TMDB_LANGUAGE",
     "TMDB_ADULT_CONTENT",
+    "THUMBNAIL_TYPE",
 ]
 rclone_options = [
     "RCLONE_CONFIG", 
@@ -407,6 +408,20 @@ async def get_user_settings(from_user, stype="main"):
                 "✓ Adult Content", f"userset {user_id} tog TMDB_ADULT_CONTENT t"
             )
             tmdb_adult = "Blocked"
+        # Thumbnail Type Toggle (Poster / Backdrop)
+        thumb_type = user_dict.get("THUMBNAIL_TYPE")
+        if thumb_type is None:
+            thumb_type = Config.THUMBNAIL_TYPE
+        if thumb_type == "backdrop":
+            buttons.data_button(
+                "🖼 Type: Backdrop", f"userset {user_id} thumb_type poster"
+            )
+            thumb_type_display = "Backdrop"
+        else:
+            buttons.data_button(
+                "🎬 Type: Poster", f"userset {user_id} thumb_type backdrop"
+            )
+            thumb_type_display = "Poster"
         buttons.data_button("TMDB API Key", f"userset {user_id} menu TMDB_API_KEY")
         tmdb_api_key = user_dict.get("TMDB_API_KEY", Config.TMDB_API_KEY) or "Not Set"
         buttons.data_button("TMDB Language", f"userset {user_id} menu TMDB_LANGUAGE")
@@ -417,6 +432,7 @@ async def get_user_settings(from_user, stype="main"):
         text = f"""⌬ <b>TMDB Settings :</b>
 ╭ <b>Name</b> → {user_name}
 ┊ Auto Thumbnail → <b>{auto_thumb}</b>
+┊ Thumbnail Type → <b>{thumb_type_display}</b>
 ┊ TMDB Enabled → <b>{tmdb_enabled}</b>
 ┊ IMDB Enabled → <b>{imdb_enabled}</b>
 ┊ Adult Content → <b>{tmdb_adult}</b>
@@ -1031,6 +1047,11 @@ async def edit_user_settings(client, query):
         else:
             back_to = "leech"
         await update_user_settings(query, stype=back_to)
+        await database.update_user_data(user_id)
+    elif data[2] == "thumb_type":
+        await query.answer()
+        update_user_ldata(user_id, "THUMBNAIL_TYPE", data[3])
+        await update_user_settings(query, stype="tmdb")
         await database.update_user_data(user_id)
     elif data[2] == "file":
         await query.answer()

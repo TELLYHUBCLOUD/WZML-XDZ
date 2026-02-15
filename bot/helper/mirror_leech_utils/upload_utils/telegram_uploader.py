@@ -588,6 +588,7 @@ class TelegramUploader:
                                     original_filename,
                                     self._listener.user_id,
                                     enabled=True,
+                                    user_dict=user_dict,
                                 )
                             )
                             if auto_thumb:
