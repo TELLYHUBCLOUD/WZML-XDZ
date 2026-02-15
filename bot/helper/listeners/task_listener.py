@@ -91,7 +91,6 @@ class TaskListener(TaskConfig):
             or getattr(Config, "LEECH_SUFFIX", "")
         )
         if prefix or suffix:
-            from os import path as ospath
             name, ext = ospath.splitext(filename)
             filename = f"{prefix}{name}{suffix}{ext}"
             LOGGER.info(
@@ -326,7 +325,6 @@ class TaskListener(TaskConfig):
                 original_up_path = up_path
                 up_path = await apply_auto_rename_to_path(up_path, self)
                 if original_up_path != up_path:
-                    from os import path as ospath
                     self.name = ospath.basename(up_path)
                     LOGGER.info(f"Updated task name after auto rename: {self.name}")
                 if self.is_cancelled:
